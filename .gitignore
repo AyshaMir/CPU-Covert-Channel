@@ -1,0 +1,21 @@
+# Compiled programs and object files
+*.o
+*.out
+*.exe
+sender
+receiver
+
+# Python caches and environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local experiment outputs
+results/*
+!results/.gitkeep
+
+# Editor/OS files
+.vscode/
+.DS_Store
+Thumbs.db
