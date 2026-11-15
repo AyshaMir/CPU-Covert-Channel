@@ -1,0 +1,9 @@
+
+#ifndef PROTOCOL_H
+#define PROTOCOL_H
+
+#define PREAMBLE "11110000"
+#define DEFAULT_BIT_DURATION_MS 200
+#define MAX_MESSAGE_BITS 1024
+
+#endif
