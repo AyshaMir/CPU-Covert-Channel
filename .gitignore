@@ -15,9 +15,19 @@ __pycache__/
 .venv/
 venv/
 
-# Local experiment outputs
+# Local experiment outputs (ephemeral)
+results/.interference.log
+results/.interference.pid
+
+# Committed report artifacts (Karim preliminary run)
+!results/
 results/*
 !results/.gitkeep
+!results/experiment_runs.csv
+!results/benchmark_slowdown_summary.csv
+!results/raw_samples.csv
+!results/plots/
+!results/plots/*.png
 
 # Editor/OS files
 .vscode/

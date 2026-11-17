@@ -82,7 +82,7 @@ Those require integration (see §7 backlog).
 
 ## 3. CSV files — what they contain
 
-All under `results/` (gitignored; regenerate with the commands above).
+All under `results/`. Summary CSVs and plots are **committed** on this branch; regenerate locally with the commands above to refresh them.
 
 ### 3.1 `experiment_runs.csv` — one row per trial
 
