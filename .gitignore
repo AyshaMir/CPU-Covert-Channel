@@ -4,6 +4,10 @@
 *.exe
 sender
 receiver
+interference
+benchmark
+timing_test
+bin/
 
 # Python caches and environments
 __pycache__/
