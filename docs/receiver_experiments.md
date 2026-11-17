@@ -33,3 +33,26 @@ Running both processes on the same logical CPU increased the benchmark execution
 ## Limitations
 
 The results are preliminary and may be influenced by background processes, CPU frequency changes, and WSL2 virtualization. Additional trials are required to establish reproducibility.
+
+## CPU Quota Experiments
+
+### Objective
+
+To evaluate the impact of Linux cgroup v2 CPU quotas on computational performance.
+
+### Methodology
+
+A single stress-ng CPU worker was executed with a requested duration of 10 seconds under different CPU quota configurations. Resource restrictions were applied using systemd-run.
+
+### Observations
+
+- Lower CPU quotas generally reduced computational throughput.
+- The 50% quota restricted CPU execution time to approximately five seconds.
+- The 25% and 10% quotas restricted CPU execution time to approximately 2.5 and 1 second, respectively.
+- The two 75% quota trials produced similar CPU times but different reported elapsed times.
+
+### Limitations
+
+WSL2 virtualization, background activities, CPU frequency variations, and measurement inconsistencies may affect experimental results. Further repeated trials are required.
+
+These experiments demonstrate the performance impact of CPU quotas but do not independently establish their effectiveness against covert communication.
