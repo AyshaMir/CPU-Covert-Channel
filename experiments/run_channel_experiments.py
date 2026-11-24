@@ -38,6 +38,9 @@ CHANNEL_FIELDS = [
     "bit_duration_ms",
     "interference_level",
     "interference_workers",
+    "affinity_mode",
+    "sender_cpu",
+    "receiver_cpu",
     "affinity_cpu",
     "bit_errors",
     "ber",
@@ -134,7 +137,9 @@ def run_one_trial(
     duration_ms: int,
     lead_ms: int,
     interference_level: str,
-    affinity_cpu: int | None,
+    sender_cpu: int | None,
+    receiver_cpu: int | None,
+    affinity_mode: str,
     with_sender: bool,
     log_dir: Path,
     trial_tag: str,
@@ -156,7 +161,7 @@ def run_one_trial(
 
         recv_cmd = prefix_taskset(
             [str(RECEIVER), msg_len, str(duration_ms), str(start_ns)],
-            affinity_cpu,
+            receiver_cpu,
         )
         recv_log = log_dir / f"{trial_tag}_receiver.txt"
         send_log = log_dir / f"{trial_tag}_sender.txt"
@@ -172,7 +177,7 @@ def run_one_trial(
         if with_sender:
             send_cmd = prefix_taskset(
                 [str(SENDER), message, str(duration_ms), str(start_ns)],
-                affinity_cpu,
+                sender_cpu,
             )
             send_proc = subprocess.run(
                 send_cmd,
@@ -233,7 +238,12 @@ def run_one_trial(
         "bit_duration_ms": duration_ms,
         "interference_level": interference_level,
         "interference_workers": workers,
-        "affinity_cpu": "" if affinity_cpu is None else affinity_cpu,
+        "affinity_mode": affinity_mode,
+        "sender_cpu": "" if sender_cpu is None else sender_cpu,
+        "receiver_cpu": "" if receiver_cpu is None else receiver_cpu,
+        "affinity_cpu": ""
+        if sender_cpu is None
+        else (sender_cpu if sender_cpu == receiver_cpu else f"{sender_cpu}+{receiver_cpu}"),
         "bit_errors": errors,
         "ber": ber,
         "throughput_bps": tput,
@@ -267,13 +277,29 @@ def main() -> None:
         default="100,200",
         help="Comma-separated bit durations (50,100,200)",
     )
-    parser.add_argument("--levels", default="none,low,high")
+    parser.add_argument(
+        "--levels",
+        default="none,low,medium,high",
+        help="Interference levels for this run",
+    )
     parser.add_argument("--trials", type=int, default=3)
     parser.add_argument(
         "--cpu",
         type=int,
         default=0,
-        help="Pin sender+receiver with taskset -c N (-1 to disable)",
+        help="When --affinity same: both processes on this CPU (-1 = no taskset)",
+    )
+    parser.add_argument(
+        "--affinity",
+        choices=("same", "separate"),
+        default="same",
+        help="same: sender+receiver on --cpu; separate: sender on --cpu, receiver on --receiver-cpu",
+    )
+    parser.add_argument(
+        "--receiver-cpu",
+        type=int,
+        default=2,
+        help="Logical CPU for receiver when --affinity separate (WSL: often 0+2)",
     )
     parser.add_argument("--lead-ms", type=int, default=5000)
     parser.add_argument(
@@ -295,7 +321,16 @@ def main() -> None:
         if d not in (50, 100, 200):
             sys.exit(f"Invalid duration {d}; use 50, 100, or 200")
     levels = [x.strip() for x in args.levels.split(",") if x.strip()]
-    cpu = None if args.cpu < 0 else args.cpu
+    if args.cpu < 0:
+        sender_cpu = receiver_cpu = None
+        affinity_mode = "unpinned"
+    elif args.affinity == "same":
+        sender_cpu = receiver_cpu = args.cpu
+        affinity_mode = "same_cpu"
+    else:
+        sender_cpu = args.cpu
+        receiver_cpu = args.receiver_cpu
+        affinity_mode = "separate_cpus"
 
     ensure_channel_bins()
     RESULTS.mkdir(parents=True, exist_ok=True)
@@ -318,17 +353,19 @@ def main() -> None:
     for duration in durations:
         for level in levels:
             for t in range(1, args.trials + 1):
-                tag = f"t{trial_id:03d}_d{duration}_{level}_{t}"
+                tag = f"t{trial_id:03d}_{affinity_mode}_d{duration}_{level}_{t}"
                 print(
-                    f"trial {trial_id}: duration={duration}ms level={level} "
-                    f"sender={'yes' if with_sender else 'no'} ..."
+                    f"trial {trial_id}: affinity={affinity_mode} duration={duration}ms "
+                    f"level={level} sender={'yes' if with_sender else 'no'} ..."
                 )
                 result = run_one_trial(
                     message=args.message,
                     duration_ms=duration,
                     lead_ms=args.lead_ms,
                     interference_level=level,
-                    affinity_cpu=cpu,
+                    sender_cpu=sender_cpu,
+                    receiver_cpu=receiver_cpu,
+                    affinity_mode=affinity_mode,
                     with_sender=with_sender,
                     log_dir=log_dir,
                     trial_tag=tag,
@@ -350,6 +387,9 @@ def main() -> None:
                         "bit_duration_ms": result["bit_duration_ms"],
                         "interference_level": result["interference_level"],
                         "interference_workers": result["interference_workers"],
+                        "affinity_mode": result["affinity_mode"],
+                        "sender_cpu": result["sender_cpu"],
+                        "receiver_cpu": result["receiver_cpu"],
                         "affinity_cpu": result["affinity_cpu"],
                         "bit_errors": result["bit_errors"],
                         "ber": ber_s,

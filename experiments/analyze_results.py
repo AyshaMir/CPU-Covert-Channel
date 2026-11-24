@@ -210,7 +210,8 @@ def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
             continue
         sent = r.get("sent_bits", "")
         recv = r.get("decoded_bits", "")
-        key = (r.get("interference_level", ""), str(r.get("bit_duration_ms", "")))
+        aff = r.get("affinity_mode", "same_cpu") or "same_cpu"
+        key = (aff, r.get("interference_level", ""), str(r.get("bit_duration_ms", "")))
         if sent:
             attempts[key] += 1
         try:
@@ -250,14 +251,18 @@ def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
     else:
         print(f"No fully decoded channel rows in {path}")
 
-    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    groups: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
     for r in out:
-        groups[(r.get("interference_level", ""), str(r.get("bit_duration_ms", "")))].append(r)
+        aff = r.get("affinity_mode", "same_cpu") or "same_cpu"
+        groups[(aff, r.get("interference_level", ""), str(r.get("bit_duration_ms", "")))].append(r)
 
-    all_keys = sorted(set(attempts.keys()) | set(groups.keys()), key=lambda k: (level_key(k[0]), k[1]))
+    def sort_key(k: tuple[str, str, str]) -> tuple:
+        return (k[0], level_key(k[1]), k[2])
+
+    all_keys = sorted(set(attempts.keys()) | set(groups.keys()), key=sort_key)
     summary_rows = []
     for key in all_keys:
-        level, duration = key
+        affinity_mode, level, duration = key
         items = groups.get(key, [])
         n_att = attempts.get(key, 0)
         n_ok = successes.get(key, 0)
@@ -294,6 +299,7 @@ def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
                         benches.append(v)
         summary_rows.append(
             {
+                "affinity_mode": affinity_mode,
                 "interference_level": level,
                 "bit_duration_ms": duration,
                 "trials_attempted": n_att,
@@ -309,6 +315,7 @@ def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
 
     with summary_csv.open("w", newline="", encoding="utf-8") as f:
         fields = [
+            "affinity_mode",
             "interference_level",
             "bit_duration_ms",
             "trials_attempted",
@@ -324,8 +331,8 @@ def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
     print(f"Wrote channel summary {summary_csv}")
     for row in summary_rows:
         print(
-            f"  level={row['interference_level']} slot={row['bit_duration_ms']}ms "
-            f"decode={row['trials_decoded']}/{row['trials_attempted']} "
+            f"  affinity={row.get('affinity_mode','')} level={row['interference_level']} "
+            f"slot={row['bit_duration_ms']}ms decode={row['trials_decoded']}/{row['trials_attempted']} "
             f"BER={row['mean_ber']} tput={row['mean_throughput_bps']} "
             f"bench_ms={row['mean_benchmark_avg_ms']}"
         )
@@ -345,7 +352,13 @@ def plot_channel(summary_rows: list[dict]) -> None:
     # Prefer one duration for the main BER bar (most common / first)
     durations = sorted({r["bit_duration_ms"] for r in summary_rows})
     for duration in durations:
-        subset = [r for r in summary_rows if str(r["bit_duration_ms"]) == str(duration)]
+        subset = [
+            r
+            for r in summary_rows
+            if str(r["bit_duration_ms"]) == str(duration) and r.get("affinity_mode") == "same_cpu"
+        ]
+        if not subset:
+            subset = [r for r in summary_rows if str(r["bit_duration_ms"]) == str(duration)]
         subset = sorted(subset, key=lambda r: level_key(r["interference_level"]))
         levels = [r["interference_level"] for r in subset]
 

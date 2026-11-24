@@ -30,6 +30,8 @@ results/*
 !results/channel_metrics.csv
 !results/channel_summary.csv
 !results/cpu_topology.txt
+!results/prabha_controls/
+!results/prabha_controls/*.csv
 !results/plots/
 !results/plots/*.png
 results/channel_logs/

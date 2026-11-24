@@ -33,7 +33,13 @@ python3 experiments/analyze_results.py
 python3 experiments/analyze_results.py --skip-workload --channel-csv results/channel_trials.csv
 ```
 
-Or one shot: `./scripts/demo.sh`
+**Full research matrix** (50/100/200 ms, medium interference, same vs separate CPU, Prabha control copy):
+
+```bash
+./scripts/run_research_matrix.sh
+```
+
+Quick demo: `./scripts/demo.sh` — full matrix: `./scripts/demo.sh full`
 
 ## Team
 - **Ayesha Mir:** sender, 50/100/200 ms slots, preamble
