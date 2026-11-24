@@ -1,0 +1,16 @@
+configuration,trial,average_ms
+baseline_cpu0,1,1.033054
+baseline_cpu0,2,0.548218
+baseline_cpu0,3,0.485673
+baseline_cpu0,4,1.043898
+baseline_cpu0,5,0.632826
+baseline_cpu1,1,0.554677
+baseline_cpu1,2,1.329016
+baseline_cpu1,3,0.504153
+baseline_cpu1,4,0.559295
+baseline_cpu1,5,0.542906
+baseline_cpu2,1,0.689434
+baseline_cpu2,2,0.504441
+baseline_cpu2,3,0.519318
+baseline_cpu2,4,0.508604
+baseline_cpu2,5,0.468884
