@@ -26,8 +26,13 @@ results/*
 !results/experiment_runs.csv
 !results/benchmark_slowdown_summary.csv
 !results/raw_samples.csv
+!results/channel_trials.csv
+!results/channel_metrics.csv
+!results/channel_summary.csv
+!results/cpu_topology.txt
 !results/plots/
 !results/plots/*.png
+results/channel_logs/
 
 # Editor/OS files
 .vscode/

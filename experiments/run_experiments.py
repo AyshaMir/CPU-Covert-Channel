@@ -75,12 +75,16 @@ def parse_probe_csv(stdout: str) -> list[float]:
 
 
 def run_probe(probe: Path, samples: int) -> list[float]:
-    # Our benchmark: N --csv. Teammate receiver: N only (CSV on stdout).
-    if probe.resolve() == DEFAULT_PROBE.resolve():
-        cmd = [str(probe), str(samples), "--csv"]
-    else:
-        cmd = [str(probe), str(samples)]
-    proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+    # Prefer --csv (Karim + Prabha benchmark). Fall back to plain argv if unsupported.
+    cmd = [str(probe), str(samples), "--csv"]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        proc = subprocess.run(
+            [str(probe), str(samples)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
     values = parse_probe_csv(proc.stdout)
     if not values:
         sys.exit(f"Probe produced no CSV samples: {probe}")

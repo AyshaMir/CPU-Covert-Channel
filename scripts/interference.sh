@@ -55,9 +55,14 @@ cmd_start() {
     fi
 
     mkdir -p "${ROOT}/results"
-    nohup "$BIN" "$workers" >>"$LOGFILE" 2>&1 &
+    # Optional: pin workers to a CPU (B3). Example: INTERFERENCE_CPU=1 ./scripts/interference.sh start high
+    if [[ -n "${INTERFERENCE_CPU:-}" ]] && command -v taskset >/dev/null 2>&1; then
+        nohup taskset -c "$INTERFERENCE_CPU" "$BIN" "$workers" >>"$LOGFILE" 2>&1 &
+    else
+        nohup "$BIN" "$workers" >>"$LOGFILE" 2>&1 &
+    fi
     echo $! >"$PIDFILE"
-    echo "Started interference level=$level workers=$workers pid=$(cat "$PIDFILE")"
+    echo "Started interference level=$level workers=$workers pid=$(cat "$PIDFILE") cpu=${INTERFERENCE_CPU:-any}"
 }
 
 cmd_stop() {

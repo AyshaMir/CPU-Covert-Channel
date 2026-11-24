@@ -1,41 +1,44 @@
-# CPU Scheduling Covert Channels
-
-Operating Systems final group project.
+# CPU Scheduling Covert Channels — Karim (`feature/interference`)
 
 ## Research question
-How reliably can two Linux processes transmit information through CPU scheduling contention without conventional inter-process communication, and how do CPU affinity, cgroup CPU bandwidth limits, and scheduling interference affect the channel's bit error rate, throughput, and legitimate workload performance?
+How reliably can two Linux processes transmit information through CPU scheduling contention, and how do affinity, cgroup quotas, and **scheduling interference** affect BER, throughput, and legitimate workload performance?
 
-## Directory guide
-- `src/`: C sender/receiver (teammates) — stubs on this branch; do not replace here
-- `src/benchmark.c`, `src/interference.c`: Karim — legitimate workload + CPU load generator
-- `scripts/`: `interference.sh` (Karim); affinity/quota remain teammate-owned
-- `experiments/`: Karim — automation and analysis
-- `results/`: measurements (gitignored)
+## What this branch owns
+- `src/benchmark.c`, `src/interference.c` — legitimate probe + CPU load generator
+- `scripts/interference.sh`, `build.sh`, `demo.sh`, `capture_topology.sh`
+- `experiments/run_experiments.py` — workload slowdown under interference
+- `experiments/run_channel_experiments.py` — **sender + receiver** under interference (BER / throughput)
+- `experiments/analyze_results.py` — slowdown + channel plots
 
-## Karim on this branch (`feature/interference`)
+Teammate `sender.c` / `receiver.c` stay **empty stubs** here. `./scripts/build.sh` compiles them from sibling worktrees into `bin/sender` and `bin/receiver` only.
 
-Build and run on **Ubuntu WSL2**:
+## Quick start (WSL2)
 
 ```bash
 ./scripts/build.sh
+./scripts/capture_topology.sh
+
+# Legitimate workload matrix
 python3 experiments/run_experiments.py --fresh --samples 20 --trials 3
+
+# Covert channel under interference (needs bin/sender + bin/receiver)
+python3 experiments/run_channel_experiments.py --fresh \
+  --message 10101010 --durations 100,200 --levels none,low,high --trials 3 --cpu 0
+
+# No-sender control (false decode baseline)
+python3 experiments/run_channel_experiments.py --no-sender \
+  --message 10101010 --durations 100 --levels none,high --trials 2 --cpu 0
+
 python3 experiments/analyze_results.py
+python3 experiments/analyze_results.py --skip-workload --channel-csv results/channel_trials.csv
 ```
 
-Levels: `none`, `low` (1 worker), `medium` (nproc/2), `high` (nproc).
-Benchmark matches the receiver-style 1M-add timing probe. BER/throughput when bit strings exist:
-
-```bash
-python3 experiments/analyze_results.py --sent-bits 10101010 --received-bits 10101110 --bit-duration-ms 100
-```
+Or one shot: `./scripts/demo.sh`
 
 ## Team
-- **Ayesha Mir:** sender, timing slots 50/100/200 ms, preamble
-- **Prabha Lakhani:** receiver sampling/decoding, affinity, cgroup quotas
-- **Karim:** interference, legitimate benchmark, experiment automation, graphs
+- **Ayesha Mir:** sender, 50/100/200 ms slots, preamble
+- **Prabha Lakhani:** receiver decode, affinity, cgroup quotas
+- **Karim:** interference, legitimate benchmark, experiment automation, graphs, channel×interference orchestration
 
-## Environment
-Ubuntu on WSL2.
-
-## Results write-up
-See `docs/KARIM_RESULTS.md` (CSVs, plots, what was measured, backlog / sender–receiver dependencies).
+## Results
+See `docs/KARIM_RESULTS.md`.
