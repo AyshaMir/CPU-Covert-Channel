@@ -1,446 +1,441 @@
 
 # CPU Scheduling Covert Channel
 
-Operating Systems Final Group Project
+**Operating Systems — Final Group Project**
 
 ## 1. Project Overview
 
-This project investigates covert communication between two Linux
-processes using CPU scheduling contention.
+This project investigates covert communication between two Linux processes through CPU scheduling contention, without conventional inter-process communication such as pipes, sockets, or shared memory.
 
-The sender and receiver communicate without using conventional
-inter-process communication mechanisms such as pipes, sockets,
-or shared memory.
+The sender transmits binary information by alternating between CPU-intensive execution and sleeping. The receiver observes variations in CPU execution availability to infer the transmitted bits.
 
-Instead, the sender alternates between CPU-intensive execution
-and sleeping. The receiver observes changes in its available
-CPU execution time to decode binary information.
-
-The project also investigates how CPU scheduling, processor
-affinity, CPU quotas, and interference affect communication
-reliability and system performance.
+The project evaluates the reliability and performance implications of this communication mechanism under different CPU placements, CPU bandwidth restrictions, transmission durations, and interference levels.
 
 ## 2. Research Question
 
-How reliably can two Linux processes transmit information
-through CPU scheduling contention without conventional
-inter-process communication, and how do CPU affinity,
-cgroup CPU bandwidth limits, and scheduling interference
-affect the channel's bit error rate, throughput, and
-legitimate workload performance?
+How reliably can two Linux processes transmit information through CPU scheduling contention without conventional inter-process communication, and how do CPU affinity, cgroup CPU bandwidth limits, and scheduling interference affect channel reliability, bit error rate, throughput, and legitimate workload performance?
 
 ## 3. Communication Protocol
 
 ### Bit Encoding
 
-- Bit 1: Sender performs CPU-intensive busy waiting.
-- Bit 0: Sender sleeps until its scheduled deadline.
+- **Bit 1:** The sender performs CPU-intensive busy waiting.
+- **Bit 0:** The sender sleeps until the scheduled deadline.
 
 ### Synchronization
 
-The sender and receiver use a shared future start timestamp
-based on CLOCK_MONOTONIC.
+The sender and receiver share a future start timestamp obtained using `CLOCK_MONOTONIC`.
 
-Each transmitted bit occupies a fixed-duration time slot.
+Both processes divide the transmission into fixed-duration time slots. Absolute deadlines limit the accumulation of timing drift between successive slots.
 
-Absolute deadlines are used to prevent individual scheduling
-delays from automatically shifting subsequent time slots.
+### Preamble and Decoding
 
-### Preamble
+Each transmission begins with the eight-bit preamble:
 
-Each transmission begins with:
+`11110000`
 
-11110000
+The receiver uses this known pattern to calibrate its decoding threshold before processing the message payload.
 
-The receiver uses this known eight-bit preamble to calculate
-a decoding threshold.
+### Supported Parameters
 
-### Supported Bit Durations
-
-- 50 ms
-- 100 ms
-- 200 ms
-
-### Message Length
-
-The implementation accepts binary messages containing
-1 to 1024 bits.
+- Bit durations: **50 ms, 100 ms, 200 ms**
+- Binary message length: **1–1024 bits**
+- Standard experimental payload: `10101010`
+- Standard preamble: `11110000`
 
 ## 4. Technologies and Environment
 
-- Language: C
-- Analysis and automation: Python 3
-- Shell scripting: Bash
-- Operating system: Ubuntu on WSL2
-- Compiler: GCC
-- CPU affinity: taskset
-- CPU bandwidth restrictions: cgroup v2 / systemd-run
-- Timing clock: CLOCK_MONOTONIC
-- Version control: Git and GitHub
+| Component                  | Technology                                |
+| -------------------------- | ----------------------------------------- |
+| Core implementation        | C                                         |
+| Compiler                   | GCC                                       |
+| Automation                 | Bash and Python 3                         |
+| Analysis and visualization | Python, Matplotlib                        |
+| Operating environment      | Ubuntu 24.04 on WSL2                      |
+| CPU affinity               | `taskset`                               |
+| CPU quotas                 | cgroup v2, `systemd-run`                |
+| CPU interference           | Custom C load generator and `stress-ng` |
+| Synchronization            | `CLOCK_MONOTONIC`                       |
+| Version control            | Git and GitHub                            |
 
-Experiments were performed using the available WSL2
-environments of the team members.
+The final experimental datasets were collected on the integrated WSL2 environment. CPU topology records are included with the final study outputs.
 
 ## 5. Repository Structure
 
-src/
-    sender.c
-    receiver.c
-    protocol.h
-    protocol_test.c
-    receiver_test.c
-    timing_test.c
+```text
+CPU-Covert-Channel/
+├── src/
+│   ├── sender.c
+│   ├── receiver.c
+│   ├── interference.c
+│   ├── benchmark.c
+│   ├── protocol.h
+│   ├── protocol_test.c
+│   ├── receiver_test.c
+│   └── timing_test.c
+│
+├── scripts/
+│   ├── build.sh
+│   ├── capture_topology.sh
+│   ├── baseline.sh
+│   ├── sender_timing.sh
+│   ├── contended_timing.sh
+│   ├── affinity.sh
+│   ├── quota.sh
+│   ├── channel_trials.py
+│   ├── interference.sh
+│   ├── run_sender_study.sh
+│   ├── run_cpu_controls_study.sh
+│   └── run_interference_study.sh
+│
+├── experiments/
+│   ├── run_experiments.py
+│   ├── run_channel_experiments.py
+│   ├── analyze_results.py
+│   ├── analyze_baseline_results.py
+│   ├── analyze_sender_timing.py
+│   ├── compare_sender_timing.py
+│   ├── analyze_throughput.py
+│   └── analyze_cpu_controls.py
+│
+├── results/
+│   └── studies/
+│       ├── sender/
+│       ├── cpu_controls/
+│       └── interference/
+│
+├── docs/
+│   ├── baseline_experiments.md
+│   ├── receiver_experiments.md
+│   └── KARIM_RESULTS.md
+│
+└── README.md
+```
 
-scripts/
-    baseline.sh
-    sender_timing.sh
-    contended_timing.sh
-    affinity.sh
-    quota.sh
-    interference.sh
+Compiled binaries are generated under `bin/` and excluded from Git.
 
-experiments/
-    analyze_results.py
-    analyze_sender_timing.py
-    compare_sender_timing.py
-    analyze_throughput.py
-    run_experiments.py
+## 6. Building and Testing
 
-results/
-    baseline/
-    timing/
-    initial_contention.csv
-    cpu_quota_results.csv
+### Prerequisites
 
-docs/
-    baseline_experiments.md
-    receiver_experiments.md
+The project requires a Linux environment with GCC, Python 3, Bash, `taskset`, `stress-ng`, and a working user-level systemd environment for CPU quota experiments.
 
-README.md
+Matplotlib is required for generating graphs.
 
-Some experiment-control and automation scripts remain
-placeholders while team integration continues.
+### Build
 
-## 6. Building the Programs
+From the project root:
 
-Compile the sender:
+```bash
+bash scripts/build.sh
+```
 
-gcc -Wall -Wextra -O2 src/sender.c -o sender
-
-Compile the receiver:
-
-gcc -Wall -Wextra -O2 src/receiver.c -o receiver
-
-The compiled executables are excluded from version control.
+This compiles the sender, receiver, legitimate workload benchmark, and interference generator into `bin/`.
 
 ### Receiver Self-Test
 
+```bash
 ./bin/receiver --self-test
+```
 
-This runs the receiver's built-in synthetic decoding test.
+### C Tests
 
-## 7. Running a Communication Experiment
+```bash
+for test in protocol_test receiver_test timing_test; do
+    gcc -Wall -Wextra -O2 "src/${test}.c" -o "/tmp/${test}"
+    "/tmp/${test}"
+done
+```
+
+The integrated project was rebuilt and these tests were executed successfully after completing the final experiments.
+
+## 7. Running the Covert Channel
 
 The sender and receiver must use the same:
 
-- Future CLOCK_MONOTONIC start timestamp
-- Bit duration
-- Expected message length
+1. Future `CLOCK_MONOTONIC` start timestamp.
+2. Bit duration.
+3. Expected payload length.
 
-The following script runs a baseline communication experiment:
+### Sender Interface
 
-bash scripts/baseline.sh 100 10101010 11
+```bash
+./bin/sender <bits> <duration_ms> <start_ns> [--timing]
+```
 
-Arguments:
+### Receiver Interface
 
-1. Bit duration in milliseconds
-2. Binary message
-3. Number of trials
-
-This example executes 11 trials using a 100 ms bit
-duration and the message 10101010.
-
-Both processes are pinned to logical CPU 0.
-
-Raw output is saved locally under results/baseline/.
-
-The sender and receiver can also be executed independently
-using their command-line interfaces:
-
-./bin/sender <bits></bits> <duration_ms> <start_ns> [--timing]
-
+```bash
 ./bin/receiver <message_length> <duration_ms> <start_ns>
+```
 
-The start_ns argument must represent a shared future
-CLOCK_MONOTONIC timestamp in nanoseconds.
+The `start_ns` value represents a shared future monotonic timestamp in nanoseconds.
 
-## 8. Sender Timing Experiments
+### Baseline Example
 
-### Sender-Only Timing
+```bash
+bash scripts/baseline.sh 100 10101010 15
+```
 
-Run:
+This executes 15 baseline communication trials using 100 ms bit slots.
 
-bash scripts/sender_timing.sh
+## 8. Experimental Methodology
 
-This evaluates sender timing accuracy at 50, 100,
-and 200 ms without a competing receiver.
+The final evaluation consisted of **825 experimental trials**, with 15 repetitions per condition.
 
-### Sender and Receiver Contention
+| Study             | Experimental scope                                                 |  Total trials |
+| ----------------- | ------------------------------------------------------------------ | ------------: |
+| Sender and timing | Baseline, sender-only timing, contention across three durations    |           135 |
+| CPU controls      | Affinity, quota performance, communication reliability             |           240 |
+| CPU interference  | Workload benchmarks, channel transmissions, receiver-only controls |           450 |
+| **Total**   |                                                                    | **825** |
 
-Run:
+The studies were executed sequentially to reduce interference between different experiment groups.
 
-bash scripts/contended_timing.sh
+### Study 1 — Sender and Timing
 
-This runs both processes on logical CPU 0 while
-recording sender timing measurements.
+```bash
+bash scripts/run_sender_study.sh 15
+```
 
-Each condition uses:
+This study evaluates:
 
-- Message: 10101010
-- Preamble: 11110000
-- 10 trials per duration
+- Baseline communication at 50, 100, and 200 ms.
+- Sender timing accuracy without receiver contention.
+- Sender timing accuracy with receiver contention.
+- Transmission-window throughput derived from timing logs.
 
-### Timing Analysis
+### Study 2 — CPU Affinity and Quotas
 
-Run:
+```bash
+bash scripts/run_cpu_controls_study.sh 15
+```
 
-python3 experiments/analyze_sender_timing.py
+This study evaluates:
 
-python3 experiments/compare_sender_timing.py
+- Benchmark performance under different CPU placements.
+- Benchmark performance at unrestricted, 75%, 50%, 25%, and 10% CPU bandwidth.
+- Covert-channel reliability under CPU placement and quota restrictions.
 
-The scripts calculate scheduled deadline errors and
-compare sender-only execution with sender–receiver
-contention.
+### Study 3 — CPU Interference
 
-## 9. Throughput Analysis
+```bash
+bash scripts/run_interference_study.sh 15
+```
 
-Run:
+This study evaluates:
 
-python3 experiments/analyze_throughput.py
+- Legitimate workload performance under none, low, medium, and high interference.
+- Channel reliability across two CPU placements and three bit durations.
+- Receiver-only false-positive behavior without a transmitting sender.
 
-This analyzes existing sender timing logs to calculate:
+The interference experiments use a balanced configuration of 15 repetitions per condition.
 
-- Theoretical payload throughput
-- Measured transmission duration
-- Measured transmission-window throughput
-- Initial transmission start delay
+Each study runner creates an isolated timestamped output directory containing the measurements and analysis outputs.
 
-The reported transmission-window throughput excludes
-the initial synchronization waiting period.
+For a smaller functionality check, the runners accept `1` instead of `15` as the repetition count.
 
-## 10. Experimental Results
+## 9. Final Experimental Results
 
-### Baseline Communication
+### 9.1 Sender Timing Accuracy
 
-39 baseline communication trials were completed.
+Average sender slot-end timing error:
 
-- Successful transmissions: 39/39
-- Incorrect message bits: 0/308
-- Observed BER: 0%
+| Bit duration | Sender alone | Sender with receiver |
+| ------------ | -----------: | -------------------: |
+| 50 ms        |     0.276 ms |             0.575 ms |
+| 100 ms       |     0.279 ms |             0.815 ms |
+| 200 ms       |     0.259 ms |             0.425 ms |
 
-### Sender Timing Experiments
+CPU contention increased average sender timing error at all tested durations.
 
-30 sender-only timing trials were completed.
+### 9.2 Transmission-Window Rate
 
-30 additional sender–receiver timing trials were completed.
+The sender timing study measured the following rates with the receiver present:
 
-Across these conditions, 960 bit timing records were collected.
+| Bit duration | Theoretical rate | Measured rate |
+| ------------ | ---------------: | ------------: |
+| 50 ms        |    10.000 bits/s |  9.999 bits/s |
+| 100 ms       |     5.000 bits/s |  5.000 bits/s |
+| 200 ms       |     2.500 bits/s |  2.500 bits/s |
 
-All 30 sender–receiver timing trials successfully
-decoded the transmitted message.
+These rates account for the entire transmission window, including the preamble, and exclude the initial synchronization waiting period.
 
-### Sender Timing Comparison
+They should not be interpreted as successfully delivered payload goodput.
 
-| Duration | Alone Avg End Error | Contended Avg End Error |
-| -------- | ------------------: | ----------------------: |
-| 200 ms   |         0.246362 ms |             0.840597 ms |
-| 100 ms   |         0.210907 ms |             0.781756 ms |
-| 50 ms    |         0.239125 ms |             0.652424 ms |
+### 9.3 CPU Affinity Performance
 
-### Measured Payload Throughput
+| Configuration               | Mean execution time | Slowdown |
+| --------------------------- | ------------------: | -------: |
+| Baseline                    |            1.600 ms |   1.00× |
+| Same CPU                    |            3.618 ms |   2.26× |
+| Sibling CPU configuration   |            1.945 ms |   1.22× |
+| Separate-core configuration |            1.905 ms |   1.19× |
 
-| Duration |   Theoretical | Sender + Receiver |
-| -------- | ------------: | ----------------: |
-| 200 ms   |  2.500 bits/s |   2.499923 bits/s |
-| 100 ms   |  5.000 bits/s |   4.999657 bits/s |
-| 50 ms    | 10.000 bits/s |   9.990655 bits/s |
+Direct same-CPU contention produced the largest measured performance penalty in this study.
 
-The measurements show increased sender deadline errors
-under CPU contention, while successful communication
-and near-theoretical transmission-window throughput
-were maintained in the tested conditions.
+### 9.4 CPU Quota Performance
 
-These results are preliminary and do not establish
-error-free communication under all scheduling conditions.
+| CPU quota    | Mean execution time | Slowdown |
+| ------------ | ------------------: | -------: |
+| Unrestricted |            1.688 ms |   1.00× |
+| 75%          |            1.769 ms |   1.05× |
+| 50%          |            2.423 ms |   1.44× |
+| 25%          |           11.548 ms |   6.84× |
+| 10%          |           41.571 ms |  24.63× |
 
-## 11. CPU Affinity and Quota Experiments
+Restrictive CPU quotas substantially increased legitimate execution time.
 
-Preliminary CPU contention and CPU quota experiments
-are documented in:
+### 9.5 Channel Reliability Under CPU Controls
 
-docs/receiver_experiments.md
+All conditions used 15 trials at 200 ms per bit.
 
-The available results investigate:
+| Configuration             | Correct messages | Success rate |
+| ------------------------- | ---------------: | -----------: |
+| Same CPU                  |            15/15 |         100% |
+| Sibling CPU configuration |             0/15 |           0% |
+| Separate cores            |             0/15 |           0% |
+| 75% quota                 |            15/15 |         100% |
+| 50% quota                 |            15/15 |         100% |
+| 25% quota                 |            15/15 |         100% |
+| 10% quota                 |            14/15 |        93.3% |
 
-- Benchmark execution time under CPU contention
-- Same-CPU versus separate-CPU configurations
-- CPU bandwidth restrictions using cgroup v2
+CPU quotas reduced available execution bandwidth but did not consistently prevent covert communication.
 
-These initial performance experiments do not independently
-establish the effects of quotas on covert-channel BER.
+### 9.6 Legitimate Workload Under Interference
 
-Further integration with communication experiments
-is part of the remaining group work.
+| Interference | Mean benchmark time | Slowdown |
+| ------------ | ------------------: | -------: |
+| None         |            1.383 ms |   1.00× |
+| Low          |            1.890 ms |   1.37× |
+| Medium       |            2.601 ms |   1.88× |
+| High         |            5.913 ms |   4.27× |
 
-## 12. Experimental Data
+High interference produced the largest degradation in legitimate workload performance.
 
-Communication summaries:
+### 9.7 Channel Reliability Under Interference
 
-results/baseline/
+Exact-message success rates with sender and receiver sharing the same logical CPU:
 
-Sender timing and throughput summaries:
+| Interference | 50 ms | 100 ms | 200 ms |
+| ------------ | ----: | -----: | -----: |
+| None         |  100% |   100% |   100% |
+| Low          |  100% |   100% |   100% |
+| Medium       |  100% |   100% |   100% |
+| High         | 33.3% |  53.3% |  40.0% |
 
-results/timing/
+Across the 135 same-CPU trials with none, low, or medium interference, every message was received correctly.
 
-CPU contention measurements:
+Under high interference, only **19 of 45** messages were received correctly.
 
-results/initial_contention.csv
+Across the 180 separate-CPU transmissions, **no exact message was received successfully**. Three trials produced complete but incorrect decoded messages.
 
-CPU quota measurements:
+### 9.8 Receiver-Only False-Positive Controls
 
-results/cpu_quota_results.csv
+| Interference | Decoded messages |  Rate |
+| ------------ | ---------------: | ----: |
+| None         |             0/15 |    0% |
+| High         |             1/15 | 6.67% |
 
-Important analyzed CSV datasets are included in the
-repository.
+A decoded message was observed once under high interference despite the absence of a transmitting sender.
 
-Raw experiment logs are excluded from version control
-and retained locally. Scripts that regenerate summaries
-from raw logs require those local files.
+This demonstrates that scheduling noise can occasionally resemble the expected signal.
 
-## 13. Team Responsibilities
+## 10. Interpreting Reliability and Throughput
 
-### Person 1 — Sender and Timing Experiments
+The project distinguishes several measurements:
 
-- Sender implementation
-- Busy/idle bit encoding
-- CLOCK_MONOTONIC synchronization
-- Configurable bit durations
-- Baseline communication testing
-- Sender timing accuracy
-- Contended timing comparison
-- Transmission-speed analysis
-- Experimental documentation
+- **Decode success rate:** Fraction of attempts that produce a complete decoded message.
+- **Exact-message success rate:** Fraction of attempts that recover the transmitted payload without errors.
+- **Bit error rate (BER):** Fraction of incorrect bits among complete decoded messages.
+- **Nominal payload rate:** Payload length divided by the nominal total transmission time, including preamble overhead.
+- **Successful-message goodput:** Payload rate adjusted for the proportion of exactly correct messages.
+
+Failed decoding attempts are not assigned an artificial BER of zero.
+
+For the standard eight-bit payload and eight-bit preamble, nominal payload rates are 10, 5, and 2.5 bits/s for 50, 100, and 200 ms slots, respectively.
+
+These nominal rates exclude synchronization startup delay and should not be confused with end-to-end delivery throughput.
+
+## 11. Experimental Evidence
+
+Final evidence is preserved under:
+
+```text
+results/studies/
+├── sender/
+│   └── 20261125T162300Z_56305/
+├── cpu_controls/
+│   └── 20261125T163850Z_61695/
+└── interference/
+    └── 20261125T165714Z_65555/
+```
+
+The final datasets include:
+
+- Raw sender and receiver logs.
+- Individual experimental trial measurements.
+- Aggregated summary CSV files.
+- CPU topology records.
+- Generated graphs.
+
+The complete final evidence is committed to version control.
+
+## 12. Team Responsibilities
+
+### Person 1 — Sender and Timing
+
+- Sender implementation.
+- Busy/idle bit encoding.
+- Protocol synchronization.
+- Configurable transmission durations.
+- Baseline communication experiments.
+- Sender timing and contention measurements.
+- Transmission-rate analysis.
 
 ### Person 2 — Receiver and CPU Controls
 
-- Receiver implementation and decoding
-- CPU affinity experiments
-- cgroup v2 CPU quota experiments
-- Scheduling contention measurements
-- Communication reliability under CPU restrictions
+- Receiver implementation and calibration.
+- Bit decoding and reliability measurements.
+- CPU affinity experiments.
+- cgroup v2 CPU quota experiments.
+- Legitimate workload performance under CPU restrictions.
 
 ### Person 3 — Interference and Benchmarking
 
-- Interference workload generation
-- Legitimate workload benchmarking
-- Experiment automation
-- Performance and reliability measurements
-- Result aggregation and graphs
+- CPU interference generation.
+- Legitimate workload benchmarking.
+- Automated interference experiments.
+- Receiver-only false-positive controls.
+- Result aggregation, analysis, and visualization.
 
 ### Shared Responsibilities
 
-- Integration and testing
-- Final experimental comparisons
-- Research report
-- Presentation
-- Viva preparation
+- Integration and validation.
+- Experimental methodology.
+- Comparative analysis.
+- Research report.
+- Presentation and viva preparation.
 
-## 14. Limitations
+## 13. Limitations
 
-- Experiments primarily use Ubuntu WSL2.
-- CPU affinity does not guarantee exclusive CPU access.
-- Background scheduling activity is not fully controlled.
-- Most communication tests used short binary messages.
-- The baseline experiments introduced no deliberate
-  additional interference.
-- Sender timing measurements do not capture every
-  scheduler interruption.
-- Measured transmission-window rates exclude startup
-  and synchronization waiting overhead.
-- Results may differ on other operating systems,
-  processors, or workload configurations.
+- The final experiments were conducted in Ubuntu on WSL2; outcomes may differ on native Linux and other hardware.
+- CPU affinity restricts processor placement but does not provide exclusive CPU ownership.
+- Background processes and operating system scheduling activity cannot be completely eliminated.
+- The experiments primarily used a short, alternating eight-bit payload.
+- The tested sender and receiver shared a future start time; synchronization distribution was not part of the covert channel.
+- The primary channel measurement relies on contention and may not operate reliably across all CPU placements.
+- CPU interference workers were not necessarily pinned to individual CPUs.
+- Benchmarks collected within channel trials measure workload performance under active interference but are not simultaneous measurements of the payload transmission itself.
+- Some measured throughput values exclude initial waiting and synchronization overhead.
+- The results characterize the tested configurations and should not be generalized to every Linux scheduler or CPU topology.
 
-## 15. Remaining Group Work
+## 14. Conclusion
 
-- Integrate affinity and quota results with communication tests.
-- Integrate scheduling interference experiments.
-- Compare bit error rate, throughput, and workload overhead.
-- Generate final comparative graphs.
-- Complete the research report and presentation.
+The experiments demonstrate that CPU scheduling contention can support covert communication between otherwise separate processes.
 
-## 16. Interference and Workload Experiments
+Communication was highly reliable when both processes shared a logical CPU under low or moderate scheduling interference. Moving the processes to separate CPUs largely prevented reliable decoding in the tested environment.
 
-Karim implemented the interference generation, legitimate
-workload benchmarking, and automated channel experiments.
+CPU quotas introduced substantial legitimate workload overhead but did not consistently eliminate the communication channel. High scheduling interference reduced channel reliability while also degrading legitimate benchmark performance and occasionally producing false-positive decoding.
 
-### Components
-
-- `src/interference.c`: CPU load generator
-- `src/benchmark.c`: Legitimate workload benchmark
-- `scripts/interference.sh`: Configurable CPU interference
-- `experiments/run_experiments.py`: Workload slowdown analysis
-- `experiments/run_channel_experiments.py`: Channel experiments
-- `scripts/run_research_matrix.sh`: Full experiment matrix
-- `scripts/demo.sh`: Demonstration runner
-
-### Experimental Conditions
-
-Interference levels:
-
-- None
-- Low
-- Medium
-- High
-
-CPU configurations:
-
-- Sender and receiver on the same logical CPU
-- Sender and receiver on separate logical CPUs
-
-Bit durations:
-
-- 50 ms
-- 100 ms
-- 200 ms
-
-### Preliminary Findings
-
-The interference experiments showed:
-
-- Successful decoding under none, low, and medium
-  interference when sharing CPU 0.
-- Reduced decoding success under high interference.
-- No successful decoding in the tested separate-CPU
-  configurations.
-- Approximately 2.30x legitimate workload slowdown
-  under high interference.
-
-These results were obtained on Karim's WSL2 environment
-and should not be generalized without further testing.
-
-### Experimental Evidence
-
-- `docs/KARIM_RESULTS.md`
-- `results/channel_trials.csv`
-- `results/channel_summary.csv`
-- `results/benchmark_slowdown_summary.csv`
-- `results/plots/`
-
-### Integration Note
-
-Karim's original build script expects separate teammate
-worktrees. Its build paths must be adapted to the combined
-repository before running the full experiment matrix.
-
-The final integration will also standardize throughput
-definitions and verify experiment reproducibility.
+These findings illustrate the relationship between covert-channel reliability, CPU scheduling behavior, and the performance costs of resource restrictions.

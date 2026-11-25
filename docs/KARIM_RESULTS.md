@@ -1,418 +1,167 @@
+# CPU Interference, Channel Reliability, and Legitimate Workload Results
 
-# Karim — Results, Artifacts, and Remaining Scope
-
-**Project:** CPU Covert Channel via Scheduling Contention
-**Member:** Karim
-**Development branch:** `feature/interference`
+**Project:** CPU Scheduling Covert Channel — Operating Systems Final Group Project
+**Team member:** Karim
+**Evidence:** Final balanced interference study conducted November 25, 2026
 **Integrated branch:** `integration/final-experiments`
-**Experimental environment:** WSL2 on `DESKTOP-2AJS0GP`, 4 logical CPUs
 
----
+## 1. Responsibility and objective
 
-## 1. Team Responsibilities
+Karim implemented the CPU interference generator, legitimate workload benchmark, channel experiment automation, result aggregation, and graphs. The goal was to quantify how additional CPU activity affects both legitimate execution and a scheduling-based covert channel, and to test whether the receiver sometimes detects a payload when no sender exists.
 
-| Member           | Responsibility                                                                                                                                     |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Ayesha** | Sender implementation, busy/idle bit encoding, preamble, timing synchronization, configurable 50/100/200 ms slots, baseline and timing experiments |
-| **Prabha** | Receiver implementation and decoding, CPU affinity experiments, cgroup CPU quota experiments                                                       |
-| **Karim**  | Scheduling interference generator, legitimate workload benchmark, automated experiment runners, BER and throughput analysis, performance graphs    |
+### Main components
 
-All three contributions have been combined on the local integration branch.
+- `src/interference.c` — synthetic CPU load generator.
+- `src/benchmark.c` — legitimate computation benchmark.
+- `scripts/interference.sh` — starts and stops load at none/low/medium/high levels.
+- `experiments/run_experiments.py` — repeated legitimate workload benchmarks.
+- `experiments/run_channel_experiments.py` — controlled sender/receiver attempts with logs and per-trial CSV records.
+- `experiments/analyze_results.py` — summaries, rates, BER, workload comparisons, and plots.
+- `scripts/run_interference_study.sh` — integrated final study runner.
 
----
+The four C programs build together with `scripts/build.sh`.
 
-## 2. Implemented Components
+## 2. Environment and experimental design
 
-### Core Programs
+The **final** research results below were collected on the integrated Ubuntu/WSL2 study environment. Earlier exploratory work on a separate team machine is not mixed into these final measurements.
 
-- `src/sender.c` — CPU busy/idle signal transmission (Ayesha).
-- `src/receiver.c` — CPU contention measurement and message decoding (Prabha).
-- `src/interference.c` — CPU load generation for interference experiments (Karim).
-- `src/benchmark.c` — Legitimate workload performance measurement (Karim).
+- Sender payload: `10101010`; preamble: `11110000`.
+- Bit durations: 50, 100, and 200 ms.
+- Interference levels: none, low, medium, high.
+- Placement: sender and receiver both on logical CPU 0, or sender on CPU 0 and receiver on CPU 2.
+- Fifteen repetitions per condition.
+- Shared future `CLOCK_MONOTONIC` start time.
+- Interference worker counts as recorded in the run's CSVs; workers were not necessarily pinned to the sender's CPU.
 
-### Build and Execution
+| Experiment                    |                     Conditions | Repetitions |        Trials |
+| ----------------------------- | -----------------------------: | ----------: | ------------: |
+| Legitimate workload benchmark |       Four interference levels |          15 |            60 |
+| Same-CPU covert channel       |        3 durations × 4 levels |          15 |           180 |
+| Separate-CPU covert channel   |        3 durations × 4 levels |          15 |           180 |
+| Receiver-only control         | None/high interference, 100 ms |          15 |            30 |
+| **Total**               |        **30 conditions** |             | **450** |
 
-- `scripts/build.sh` — Compiles all four C programs from the integrated `src/` directory into `bin/`.
-- `scripts/interference.sh` — Starts, stops, and checks interference workers at none, low, medium, and high levels.
-- `experiments/run_experiments.py` — Executes legitimate workload experiments under different interference levels.
-- `experiments/run_channel_experiments.py` — Executes sender–receiver communication trials under interference and CPU affinity configurations.
-- `scripts/run_research_matrix.sh` — Coordinates the workload and channel research matrix.
-- `scripts/demo.sh` — Provides demonstration functionality; its commands should be reviewed before running.
-- `experiments/analyze_results.py` — Produces workload and channel summaries and visualizations.
+The 360 sender-present channel attempts plus 30 receiver-only controls make 390 channel/control trials. The 60 workload benchmarks are a separate experiment.
 
-### Integrated CPU Controls
+## 3. Effect on legitimate workload performance
 
-- `scripts/affinity.sh` — Measures legitimate workload performance under different CPU affinity configurations.
-- `scripts/quota.sh` — Measures legitimate workload performance under different CPU bandwidth quotas.
+The dedicated workload benchmark used 20 samples per trial, with 15 trials at each interference level.
 
-The sender, receiver, interference generator, and benchmark have been compiled and tested together successfully.
+| Interference level | Mean trial-average time | SEM across trials | Slowdown vs none |
+| ------------------ | ----------------------: | ----------------: | ---------------: |
+| None               |             1.383170 ms |       0.013758 ms |          1.000× |
+| Low                |             1.889723 ms |       0.119024 ms |          1.366× |
+| Medium             |             2.601473 ms |       0.071586 ms |          1.881× |
+| High               |             5.912803 ms |       0.294446 ms |          4.275× |
 
----
+High interference increased mean benchmark time to roughly 4.27 times its no-interference baseline. Within-trial timing variance was also higher under high interference; the mean coefficient of variation was approximately 0.411, compared with 0.047 under none.
 
-## 3. Research Questions Addressed
+## 4. Covert-channel reliability on the same CPU
 
-### 3.1 Does additional CPU load affect legitimate workload performance?
+The following entries are **exact-message successes** out of 15 attempts. These are not merely complete decodes: the received eight-bit payload had to match the sender's payload exactly.
 
-Yes. Karim's experiments measured benchmark execution time under four interference levels.
+| Interference |        50 ms |       100 ms |       200 ms |
+| ------------ | -----------: | -----------: | -----------: |
+| None         | 15/15 (100%) | 15/15 (100%) | 15/15 (100%) |
+| Low          | 15/15 (100%) | 15/15 (100%) | 15/15 (100%) |
+| Medium       | 15/15 (100%) | 15/15 (100%) | 15/15 (100%) |
+| High         | 5/15 (33.3%) | 8/15 (53.3%) | 6/15 (40.0%) |
 
-In the recorded research matrix, high interference produced approximately **2.30× slowdown** relative to the no-interference baseline.
+All **135/135** same-CPU messages under none, low, or medium interference were correct. Under high interference, **19/45** were correct.
 
-### 3.2 Does scheduling interference affect covert-channel reliability?
+### High-interference decoding details
 
-Yes. On the same logical CPU, communication succeeded under none, low, and medium interference in the recorded trials.
+| Slot duration | Complete decodes | Exact-message successes | Mean BER on complete decodes |
+| ------------- | ---------------: | ----------------------: | ---------------------------: |
+| 50 ms         |            10/15 |                    5/15 |                     0.187500 |
+| 100 ms        |            13/15 |                    8/15 |                     0.096154 |
+| 200 ms        |             7/15 |                    6/15 |                     0.017857 |
 
-Under high interference, only 2 of 6 communication trials decoded successfully.
+The lowest observed mean BER among complete decodes is not necessarily the highest message success rate, because failed or incomplete decodes are excluded from BER but count as unsuccessful messages.
 
-### 3.3 How does CPU placement affect communication?
+## 5. Covert-channel reliability on separate CPUs
 
-When the sender and receiver shared logical CPU 0, communication was generally successful under conditions without heavy interference.
+Across **180 sender-present attempts** with sender on logical CPU 0 and receiver on CPU 2:
 
-When the sender was assigned CPU 0 and the receiver CPU 2, none of Karim's 16 recorded trials decoded successfully.
+- **0/180** messages were received exactly.
+- Three attempts produced complete but incorrect messages (one at 200 ms/low interference and two at 50 ms/high interference).
+- The other 177 attempts produced no complete decoded payload.
 
-These results suggest that shared CPU scheduling contention is essential to this implementation's communication mechanism under the tested configurations.
+This shows that the receiver generally did not observe a reliable signal across these logical CPU placements in the tested implementation. It does **not** prove that all CPU covert channels fail between separate cores or machines.
 
-### 3.4 How do bit durations affect communication?
+## 6. Receiver-only false-positive control
 
-Experiments used 50, 100, and 200 ms bit durations.
+The receiver was run without a sender to test whether unrelated scheduling activity could yield decoded bits.
 
-The recorded same-CPU results show successful decoding at all three durations under none, low, and medium interference.
+| Interference | Receiver produced a decoded payload | Observed rate |
+| ------------ | ----------------------------------: | ------------: |
+| None         |                                0/15 |            0% |
+| High         |                                1/15 |         6.67% |
 
-Further trials are needed to establish whether one duration is statistically more reliable under heavy interference.
+The high-interference case is a **false-positive decode event** because a message was decoded in the absence of a sender. It is not a correctly delivered sender message.
 
-### 3.5 What is the performance cost to legitimate workloads?
+## 7. Metrics and interpretation
 
-The experiments record benchmark execution times under different interference levels.
+- **Decode success rate:** fraction of channel attempts producing a complete decoded payload.
+- **Message success rate:** fraction producing the *exact* payload transmitted.
+- **BER:** incorrect bits / payload bits, **only for complete comparable decodes**. Missing decodes have undefined BER (`nan`), not BER = 0.
+- **Raw nominal bit rate:** 1000 / slot duration in milliseconds; includes preamble slots as raw transmitted symbols.
+- **Nominal payload rate:** 8 payload bits divided by 16 total slots × slot duration.
+- **Successful-message goodput:** nominal payload rate multiplied by exact-message success fraction. This is a nominal-window, successful-message metric; it excludes startup, initial synchronization wait, and retransmissions.
+- **Benchmark slowdown:** mean benchmark execution time under a level divided by no-interference mean.
 
-The `benchmark_avg_ms` field in the channel trial data represents a benchmark run after each channel transmission while the configured interference level is still active.
+| Slot duration | Nominal raw rate | Nominal payload rate |
+| ------------- | ---------------: | -------------------: |
+| 50 ms         |        20 bits/s |            10 bits/s |
+| 100 ms        |        10 bits/s |             5 bits/s |
+| 200 ms        |         5 bits/s |           2.5 bits/s |
 
-It should not be described as measuring benchmark execution simultaneously with sender–receiver transmission.
+The legacy `throughput_bps` field in the channel CSV is an error-adjusted nominal symbol-rate proxy, not confirmed payload goodput. Use `nominal_payload_bps` and `successful_goodput_bps` in the final summary when discussing delivery rates.
 
-### 3.6 How do CPU quotas affect the covert channel?
+### Benchmark timing within channel trials
 
-Prabha's experiments include sender-quota communication trials at 75%, 50%, 25%, and 10% CPU quotas.
+The channel runner runs its quick benchmark **after** a communication attempt while the selected interference level remains active. This produces a paired observation of background interference performance, **not** a benchmark running concurrently with the payload transmission. The 60-trial dedicated workload study is the primary source for the slowdown results in Section 3.
 
-Her recorded results indicate successful decoding in all 20 quota trials.
+## 8. Reproduce the final interference study
 
-These results should be analyzed alongside the separate legitimate workload quota benchmarks.
-
-Karim's original interference matrix does not independently vary CPU quota.
-
----
-
-## 4. Recorded Research Matrix
-
-### 4.1 Legitimate Workload Under Interference
-
-| Interference level |        Mean slowdown |
-| ------------------ | -------------------: |
-| None               |               1.00× |
-| Low                | Approximately 1.36× |
-| Medium             | Approximately 1.00× |
-| High               | Approximately 2.30× |
-
-The low and medium interference measurements are not strictly monotonic.
-
-Possible explanations include WSL2 scheduling variability, interference placement, and background system activity.
-
-These measurements should be interpreted as observations from the recorded experiments rather than precise universal slowdown factors.
-
-### 4.2 Covert Channel — Same Logical CPU
-
-**Configuration:**
-
-- Sender: CPU 0
-- Receiver: CPU 0
-- Message: `10101010`
-- Preamble: `11110000`
-- Two trials per configuration
-
-| Bit duration | None        | Low | Medium | High |
-| ------------ | ----------- | --- | ------ | ---- |
-| 50 ms        | 2/2 decoded | 2/2 | 2/2    | 1/2  |
-| 100 ms       | 2/2 decoded | 2/2 | 2/2    | 0/2  |
-| 200 ms       | 2/2 decoded | 2/2 | 2/2    | 1/2  |
-
-**Observations:**
-
-- All 18 trials under none, low, and medium interference decoded successfully.
-- Only 2 of 6 trials under high interference decoded successfully.
-- The recorded successful decodes had zero bit errors.
-- Failed decoding is tracked separately from BER.
-
-**Interpretation:**
-
-The channel demonstrated reliable communication under the tested low-interference configurations.
-
-High interference substantially reduced decoding success in this small experimental sample.
-
-The limited number of trials prevents strong statistical conclusions about differences between bit durations.
-
-### 4.3 Covert Channel — Separate Logical CPUs
-
-**Configuration:**
-
-- Sender: CPU 0
-- Receiver: CPU 2
-- Bit durations: 100 and 200 ms
-- Interference levels: none, low, medium, high
-
-**Result:** 0 successful decodes across 16 trials.
-
-**Interpretation:**
-
-In this implementation, the receiver measures scheduling contention using its own CPU-time-to-wall-time ratio.
-
-When the sender and receiver occupy separate logical CPUs, sender activity may no longer produce a sufficiently distinguishable signal.
-
-The recorded result indicates that separating the processes prevented successful decoding under these tested WSL2 conditions.
-
-This should not be generalized to every possible CPU covert channel or hardware configuration.
-
-### 4.4 No-Sender Control
-
-The receiver was tested without a sender under none and high interference.
-
-In both recorded controls, no payload was successfully decoded.
-
-These results provide a preliminary false-positive check.
-
-However, two trials are insufficient to establish a reliable false-positive rate.
-
-### 4.5 Additional Integration Trial
-
-An additional integration trial was executed on `DESKTOP-V8D55GU` with:
-
-- Sender and receiver on CPU 0
-- 100 ms bit duration
-- Low interference
-- Message `10101010`
-
-**Result:**
-
-- Decoded message: `10101010`
-- Bit errors: 0
-- BER: 0%
-- Benchmark average: 3.7682 ms
-- Sender exit code: 0
-- Receiver exit code: 0
-
-This trial confirmed that the merged sender, receiver, and interference workflow operated successfully on a second WSL2 environment.
-
-It should be distinguished from Karim's original experimental trials.
-
----
-
-## 5. Measurement Definitions
-
-### Decoding Success Rate
-
-The proportion of trials where the receiver successfully produced the intended message.
-
-Failed decoding attempts must be counted when calculating communication success rates.
-
-### Bit Error Rate (BER)
-
-The number of incorrect received bits divided by the number of transmitted bits for comparable decoded messages.
-
-If the receiver produces no decoded message, BER is recorded as undefined rather than automatically assigning 0% or 50%.
-
-### Raw Bit Rate
-
-The number of transmitted bit slots per second.
-
-The nominal raw bit rates are:
-
-| Bit duration | Raw bit rate |
-| ------------ | -----------: |
-| 200 ms       |     5 bits/s |
-| 100 ms       |    10 bits/s |
-| 50 ms        |    20 bits/s |
-
-### Effective Payload Throughput
-
-Useful successfully delivered payload bits per second, accounting for the preamble and transmission duration.
-
-For an eight-bit message with an eight-bit preamble and no errors, the nominal payload rates are:
-
-| Bit duration | Nominal payload throughput |
-| ------------ | -------------------------: |
-| 200 ms       |                 2.5 bits/s |
-| 100 ms       |                   5 bits/s |
-| 50 ms        |                  10 bits/s |
-
-These rates exclude the initial synchronization waiting period.
-
-Karim's original `throughput_bps` column should not automatically be interpreted as measured effective payload throughput.
-
-### Legitimate Workload Slowdown
-
-The ratio of workload execution time under a tested condition to its baseline execution time.
-
-A slowdown above 1.0 indicates increased execution time.
-
----
-
-## 6. Experimental Artifacts
-
-| File or directory                                                         | Purpose                                                                                |
-| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `results/experiment_runs.csv`                                           | Original interference workload trials                                                  |
-| `results/raw_samples.csv`                                               | Individual workload timing samples                                                     |
-| `results/benchmark_slowdown_summary.csv`                                | Workload slowdown summary                                                              |
-| `results/channel_trials.csv`                                            | Channel communication trials                                                           |
-| `results/channel_summary.csv`                                           | Channel reliability summaries                                                          |
-| `results/channel_metrics.csv`                                           | Channel metrics                                                                        |
-| `results/topology.txt`                                                  | `Preserved CPU topology records from Karim's and Prabha's experimental environments` |
-| `results/plots/`                                                        | Original workload and channel visualizations                                           |
-| `results/affinity_performance.csv/ and results/quota_performance.csv/ ` | Prabha's original CPUaffinity and quota benchmark results                              |
-| `results/channel_logs/`                                                 | Original sender and receiver trial logs where available                                |
-| `results/integration_matrix/`                                           | Separate output directory for future integrated research-matrix runs                   |
-
-Original experimental datasets should be preserved during repository cleanup and further analysis.
-
----
-
-## 7. Reproducing Experiments
-
-### Build
-
-From the repository root:
+From the project root:
 
 ```bash
 bash scripts/build.sh
+bash scripts/run_interference_study.sh 15
 ```
 
-This builds:
+For a one-repetition pilot, run `bash scripts/run_interference_study.sh 1`. Each invocation creates a separate timestamped output directory. Avoid additional CPU-heavy workloads while collecting timing results.
 
-```text
-bin/sender
-bin/receiver
-bin/benchmark
-bin/interference
-```
+### Verified final evidence
 
-### Run a Single Channel Experiment
+`results/studies/interference/20261125T165714Z_65555/`
 
-Example: same logical CPU, 100 ms slots, low interference, one trial.
+| Artifact                           | Contents                                                  |
+| ---------------------------------- | --------------------------------------------------------- |
+| `experiment_runs.csv`            | 60 dedicated workload trials                              |
+| `raw_samples.csv`                | Individual benchmark timing samples                       |
+| `benchmark_slowdown_summary.csv` | Dedicated workload means, variability, slowdown           |
+| `channel_trials.csv`             | 360 sender-present attempts + 30 receiver-only controls   |
+| `channel_metrics.csv`            | Per-attempt channel metrics for sender-present conditions |
+| `channel_summary.csv`            | 24 channel condition summaries, 15 attempts each          |
+| `channel_logs/`                  | Raw sender and receiver logs                              |
+| `cpu_topology.txt`               | CPU layout captured during this study                     |
+| `plots/`                         | 16 final performance and channel figures                  |
 
-```bash
-python3 experiments/run_channel_experiments.py \
-    --message 10101010 \
-    --durations 100 \
-    --levels low \
-    --trials 1 \
-    --affinity same \
-    --cpu 0 \
-    --output results/integration_matrix/channel_trials.csv
-```
+The final evidence is committed to Git. Earlier demonstration outputs and the superseded `demo.sh` and `run_research_matrix.sh` scripts were removed during repository cleanup.
 
-### Run CPU Affinity Benchmark
+## 9. Limitations
 
-```bash
-bash scripts/affinity.sh
-```
+- WSL2 virtualization and host background activity may influence observed CPU timing.
+- Interference workers were not necessarily assigned to a specific logical CPU; worker count is not a direct measure of sender/receiver contention.
+- Same and separate CPU placement is based on logical CPU numbers; confirm topology from the recorded `cpu_topology.txt`.
+- Trials used the fixed alternating eight-bit payload, not a representative sample of all possible binary messages.
+- Fifteen repetitions per condition quantify observed behavior but do not eliminate sampling uncertainty.
+- Workload benchmarks measured during channel trials were not simultaneous with sender-to-receiver transmission.
+- Nominal goodput excludes initial synchronization waiting, process startup, and retransmission costs.
+- The no-sender control examined only two interference conditions at 100 ms.
 
-### Run CPU Quota Benchmark
+## 10. Conclusion
 
-```bash
-bash scripts/quota.sh
-```
-
-### Research Matrix
-
-```bash
-bash scripts/run_research_matrix.sh
-```
-
-The integrated matrix is being updated to save experiment outputs separately from the original datasets.
-
-Before rerunning the complete matrix, its workflow and output handling must pass final integration testing.
-
----
-
-## 8. Limitations and Methodological Concerns
-
-### Limited Trial Counts
-
-Karim's original channel matrix contains two trials per configuration.
-
-Additional repetitions are needed to estimate reliability more confidently.
-
-### Interference Placement
-
-Interference workers are not necessarily restricted to the same logical CPU as the sender and receiver.
-
-Therefore, the number of workers alone does not guarantee a particular level of direct contention.
-
-Future controlled interference trials should explicitly record or control worker CPU placement.
-
-### Decoding Failures
-
-Receiver failures must remain visible in the analysis.
-
-A trial that produces no decoded message represents unsuccessful communication, even if a numerical BER cannot be calculated.
-
-### Throughput Interpretation
-
-Raw bit rate and effective payload throughput are different quantities.
-
-The report must distinguish them and account for protocol overhead.
-
-### Workload Measurement Timing
-
-The benchmark executed by Karim's channel runner is measured after the channel transmission, while interference remains active.
-
-Consequently, the result measures performance under the configured background interference, not simultaneous channel-and-benchmark contention.
-
-### Environment Differences
-
-Results were collected across different WSL2 environments and CPU topologies.
-
-Direct comparisons between machines must account for these differences.
-
-### Experimental Variability
-
-CPU frequency, host activity, operating-system scheduling, and background workloads may influence timing and performance measurements.
-
-These are especially relevant when interpreting unexpected speedups or non-monotonic results.
-
----
-
-## 9. Remaining Work
-
-| Item                                         | Status                                       |
-| -------------------------------------------- | -------------------------------------------- |
-| Sender and receiver integration              | Completed                                    |
-| Integrated build system                      | Completed and tested                         |
-| Same-CPU communication                       | Completed                                    |
-| Separate-CPU communication trials            | Completed; further validation recommended    |
-| Interference workload experiments            | Completed                                    |
-| Covert-channel interference experiments      | Completed; additional trials recommended     |
-| CPU affinity benchmark                       | Completed and tested                         |
-| CPU quota benchmark                          | Completed and tested                         |
-| Sender-quota channel trials                  | Existing Prabha results; final audit pending |
-| Controlled interference CPU placement        | Pending                                      |
-| Consistent BER and decoding-success analysis | Pending                                      |
-| Standardized effective throughput            | Pending                                      |
-| Additional representative trials             | Pending                                      |
-| Repository cleanup                           | In progress                                  |
-| Final README and reproducibility testing     | Pending                                      |
-| Final report and presentation                | Pending                                      |
-| Merge integrated work into `main`          | Pending                                      |
-
----
-
-## 10. Summary for Presentation
-
-Karim implemented scheduling interference, legitimate workload benchmarking, and automated channel experiments.
-
-His recorded findings show that:
-
-- A normal workload experienced approximately 2.30× slowdown under high interference.
-- Same-CPU covert communication decoded successfully under none, low, and medium interference in the tested trials.
-- High interference reduced decoding success to 2 of 6 trials.
-- Sender–receiver separation across CPU 0 and CPU 2 prevented successful decoding in all 16 tested trials.
-
-Together with Ayesha's sender and timing experiments and Prabha's receiver and CPU-control experiments, these results demonstrate a working CPU scheduling covert channel and provide evidence about its reliability, limitations, and performance trade-offs.
-
-The findings are specific to the tested implementation and environments, and additional controlled trials are needed for stronger statistical conclusions.
+The covert channel was highly reliable when sender and receiver shared a logical CPU under none, low, or medium interference, but high interference reduced exact-message success and increased legitimate workload execution time. Moving the processes to separate logical CPUs yielded no correct transmissions in the tested 180 attempts. The receiver-only high-interference control also demonstrated that scheduling noise can occasionally produce a decoded message without a sender. Together, these findings highlight both the potential and the limitations of scheduling-contention covert communication in the evaluated WSL2 environment.

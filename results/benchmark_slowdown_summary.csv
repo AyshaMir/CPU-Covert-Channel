@@ -1,5 +1,0 @@
-interference_level,trials,mean_avg_ms,sem_across_trials_ms,mean_within_trial_std_ms,mean_cv,baseline_none_ms,slowdown_vs_none
-none,3,2.856622,0.035818,0.770685,0.269420,2.856622,1.000000
-low,3,3.875878,1.050562,1.760577,0.347014,2.856622,1.356805
-medium,3,2.852917,0.135204,0.495154,0.166784,2.856622,0.998703
-high,3,6.577160,0.399491,6.215045,0.944858,2.856622,2.302426
