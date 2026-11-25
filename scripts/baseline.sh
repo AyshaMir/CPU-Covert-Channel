@@ -6,6 +6,7 @@ DURATION="${1:-200}"
 MESSAGE="${2:-10101010}"
 TRIALS="${3:-11}"
 CPU=0
+BASE_DIR="${BASELINE_OUTPUT_DIR:-results/baseline}"
 
 # Validate duration
 if [[ ! "$DURATION" =~ ^(50|100|200)$ ]]; then
@@ -39,7 +40,7 @@ else
     MESSAGE_ID="${#MESSAGE}bits_${MESSAGE_HASH}"
 fi
 
-RESULT_DIR="results/baseline/${DURATION}ms_${MESSAGE_ID}"
+RESULT_DIR="${BASE_DIR}/${DURATION}ms_${MESSAGE_ID}"
 LOG_DIR="$RESULT_DIR/raw_logs"
 
 mkdir -p "$LOG_DIR"

@@ -4,8 +4,9 @@ set -euo pipefail
 
 MESSAGE="10101010"
 CPU=0
-TRIALS=10
+TRIALS="${TRIALS:-15}"
 DURATIONS=(200 100 50)
+TIMING_OUTPUT_DIR="${TIMING_OUTPUT_DIR:-results/timing}"
 
 # Run from the repository root
 cd "$(dirname "$0")/.."
@@ -31,7 +32,7 @@ echo "===================================="
 
 for duration in "${DURATIONS[@]}"; do
 
-    RESULT_DIR="results/timing/${duration}ms"
+    RESULT_DIR="${TIMING_OUTPUT_DIR}/${duration}ms"
     mkdir -p "$RESULT_DIR"
 
     echo ""

@@ -266,6 +266,19 @@ def next_id(rows: list[dict]) -> int:
         return 1
     return max(int(r["trial_id"]) for r in rows) + 1
 
+def save_rows_atomic(path: Path, rows: list[dict]) -> None:
+    """Save all completed trials without partially overwriting the CSV."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+
+    with temporary.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=CHANNEL_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+        f.flush()
+        os.fsync(f.fileno())
+
+    os.replace(temporary, path)
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -405,12 +418,10 @@ def main() -> None:
                     f"  decoded={result['decoded_bits'] or '(none)'} "
                     f"ber={ber_s} tput={tput_s} bench_ms={bench_s}"
                 )
+                save_rows_atomic(args.output, rows)
                 trial_id += 1
 
-    with args.output.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=CHANNEL_FIELDS)
-        w.writeheader()
-        w.writerows(rows)
+    save_rows_atomic(args.output, rows)
     print(f"Wrote {len(rows)} rows -> {args.output}")
 
 

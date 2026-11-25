@@ -1,12 +1,30 @@
-
+import argparse
 import csv
 import statistics
 from pathlib import Path
 
-BASE = Path("results/timing")
+parser = argparse.ArgumentParser(
+    description="Analyze covert-channel transmission throughput"
+)
+parser.add_argument(
+    "--base",
+    type=Path,
+    default=Path("results/timing"),
+)
+parser.add_argument(
+    "--trials",
+    type=int,
+    default=15,
+)
+args = parser.parse_args()
+
+if args.trials < 1:
+    parser.error("--trials must be positive")
+
+BASE = args.base
 DURATIONS = [200, 100, 50]
 CONDITIONS = ["alone", "contended"]
-TRIALS = 10
+TRIALS = args.trials
 PREAMBLE_BITS = 8
 
 records = []

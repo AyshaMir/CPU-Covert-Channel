@@ -1,11 +1,29 @@
-
+import argparse
 import csv
 import statistics
 from pathlib import Path
 
-BASE = Path("results/timing")
+parser = argparse.ArgumentParser(
+    description="Compare sender timing with and without receiver contention"
+)
+parser.add_argument(
+    "--base",
+    type=Path,
+    default=Path("results/timing"),
+)
+parser.add_argument(
+    "--trials",
+    type=int,
+    default=15,
+)
+args = parser.parse_args()
+
+if args.trials < 1:
+    parser.error("--trials must be positive")
+
+BASE = args.base
 DURATIONS = [200, 100, 50]
-TRIALS = 10
+TRIALS = args.trials
 
 all_records = []
 summary_rows = []

@@ -3,10 +3,33 @@ import re
 import subprocess
 import time
 from pathlib import Path
+import argparse
+from datetime import datetime, timezone
 
 MESSAGE = "10101010"
 DURATION_MS = 200
-TRIALS = 5
+parser = argparse.ArgumentParser(
+    description="Test covert-channel reliability under CPU controls"
+)
+parser.add_argument("--trials", type=int, default=15)
+parser.add_argument("--output-dir", type=Path, default=None)
+args = parser.parse_args()
+
+if args.trials < 1:
+    parser.error("--trials must be positive")
+
+TRIALS = args.trials
+
+RUN_ID = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+OUTPUT_DIR = args.output_dir or Path(
+    f"results/studies/cpu_controls/channel_{RUN_ID}_{time.monotonic_ns()}"
+)
+LOG_DIR = OUTPUT_DIR / "channel_logs"
+
+if OUTPUT_DIR.exists():
+    parser.error(f"Output directory already exists: {OUTPUT_DIR}")
+
+LOG_DIR.mkdir(parents=True)
 
 CONFIGS = [
     ("same_cpu", 0, 0, None),
@@ -18,8 +41,7 @@ CONFIGS = [
     ("quota_10", 0, 0, 10),
 ]
 
-Path("results/channel_logs").mkdir(parents=True, exist_ok=True)
-output = "results/channel_reliability.csv"
+output = OUTPUT_DIR / "channel_reliability.csv"
 
 with open(output, "w", newline="") as f:
     writer = csv.writer(f)
@@ -64,9 +86,13 @@ with open(output, "w", newline="") as f:
             receiver_log, _ = receiver.communicate()
             sender_log, _ = sender.communicate()
 
-            prefix = f"results/channel_logs/{name}_{trial}"
-            Path(prefix + "_receiver.log").write_text(receiver_log)
-            Path(prefix + "_sender.log").write_text(sender_log)
+            prefix = f"{name}_{trial}"
+            (LOG_DIR / f"{prefix}_receiver.log").write_text(
+                receiver_log, encoding="utf-8"
+            )
+            (LOG_DIR / f"{prefix}_sender.log").write_text(
+                sender_log, encoding="utf-8"
+            )
 
             match = re.search(
                 r"Received message:\s*([01]+)", receiver_log

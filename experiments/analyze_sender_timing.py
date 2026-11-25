@@ -1,9 +1,19 @@
-
+import argparse
 import csv
 import statistics
 from pathlib import Path
 
-BASE = Path("results/timing")
+parser = argparse.ArgumentParser(
+    description="Analyze sender timing accuracy"
+)
+parser.add_argument(
+    "--base",
+    type=Path,
+    default=Path("results/timing"),
+)
+args = parser.parse_args()
+
+BASE = args.base
 DURATIONS = [200, 100, 50]
 
 records = []
@@ -11,9 +21,8 @@ records = []
 for duration in DURATIONS:
     directory = BASE / f"{duration}ms"
 
-    for trial in range(1, 11):
-        filename = directory / f"trial{trial:02d}_sender.txt"
-
+    for filename in sorted(directory.glob("trial*_sender.txt")):
+        trial = int(filename.stem.split("_")[0].replace("trial", ""))
         if not filename.exists():
             print(f"Missing: {filename}")
             continue

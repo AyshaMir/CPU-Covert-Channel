@@ -1,9 +1,20 @@
-
+import argparse
 import csv
 import re
 from pathlib import Path
 
-BASE = Path("results/baseline")
+parser = argparse.ArgumentParser(
+    description="Analyze CPU covert-channel baseline experiments"
+)
+parser.add_argument(
+    "--base",
+    type=Path,
+    default=Path("results/baseline"),
+    help="Directory containing baseline experiment logs"
+)
+args = parser.parse_args()
+
+BASE = args.base
 OUTPUT = BASE / "baseline_combined_summary.csv"
 
 records = []
