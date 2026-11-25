@@ -7,12 +7,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 BENCHMARK="./bin/benchmark"
-SAMPLES=100
-TRIALS=5
+SAMPLES="${SAMPLES:-100}"
+TRIALS="${TRIALS:-15}"
 
-OUTPUT="results/affinity_performance.csv"
+OUTPUT="${AFFINITY_OUTPUT:-results/integration_affinity_performance.csv}"
+TOPOLOGY_OUTPUT="${TOPOLOGY_OUTPUT:-results/integration_cpu_topology.txt}"
 
-mkdir -p results
+mkdir -p "$(dirname "$OUTPUT")"
+mkdir -p "$(dirname "$TOPOLOGY_OUTPUT")"
 
 if [[ ! -x "$BENCHMARK" ]]; then
     echo "Benchmark executable not found."
@@ -38,38 +40,43 @@ run_test() {
     done
 }
 
+# Ensure temporary interference is stopped, even if a test fails.
+LOAD_PID=""
+
+cleanup() {
+    if [[ -n "$LOAD_PID" ]]; then
+        kill "$LOAD_PID" 2>/dev/null || true
+        wait "$LOAD_PID" 2>/dev/null || true
+        LOAD_PID=""
+    fi
+}
+
+trap cleanup EXIT INT TERM
+
 echo "Running CPU 0 baseline..."
 run_test "baseline" 0
 
 echo "Recording available CPU topology..."
-lscpu -e=CPU,CORE,SOCKET,ONLINE \
-    > results/cpu_topology.txt
+lscpu -e=CPU,CORE,SOCKET,ONLINE > "$TOPOLOGY_OUTPUT"
 
-echo "Running same CPU performance test..."
-taskset -c 0 stress-ng --cpu 1 --timeout 10s &
-LOAD_PID=$!
-sleep 1
+run_loaded_test() {
+    local config="$1"
+    local load_cpu="$2"
 
-run_test "same_cpu" 0
+    echo "Running $config performance test..."
 
-wait "$LOAD_PID"
+    taskset -c "$load_cpu" stress-ng --cpu 1 &
+    LOAD_PID=$!
 
-echo "Running sibling CPU performance test..."
-taskset -c 1 stress-ng --cpu 1 --timeout 10s &
-LOAD_PID=$!
-sleep 1
+    sleep 1
 
-run_test "sibling_cpu" 0
+    run_test "$config" 0
 
-wait "$LOAD_PID"
+    cleanup
+}
 
-echo "Running separate core performance test..."
-taskset -c 2 stress-ng --cpu 1 --timeout 10s &
-LOAD_PID=$!
-sleep 1
-
-run_test "separate_cores" 0
-
-wait "$LOAD_PID"
+run_loaded_test "same_cpu" 0
+run_loaded_test "sibling_cpu" 1
+run_loaded_test "separate_cores" 2
 
 echo "Results saved to $OUTPUT"

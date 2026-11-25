@@ -1,0 +1,27 @@
+Expected message length: 8 bits
+Bit duration: 50 ms
+Scheduled start: 25542456703020 ns
+
+Slot,CPU_time_ratio
+1,0.452491
+2,0.507950
+3,0.517105
+4,0.506899
+5,0.999774
+6,0.999246
+7,0.999388
+8,0.999278
+9,0.481133
+10,0.999776
+11,0.480252
+12,0.999388
+13,0.518521
+14,0.999570
+15,0.481605
+16,0.996494
+
+Busy reference: 0.496111
+Idle reference: 0.999422
+Threshold: 0.747767
+Preamble: 11110000
+Received message: 10101010

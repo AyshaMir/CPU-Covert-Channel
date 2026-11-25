@@ -1,21 +1,95 @@
+
+# ==========================================
 # Compiled programs and object files
+# ==========================================
+
 *.o
 *.out
 *.exe
+
 sender
 receiver
+interference
+benchmark
+timing_test
+bin/
 
+# ==========================================
 # Python caches and environments
+# ==========================================
+
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 
-# Local experiment outputs
+# ==========================================
+# Local temporary experiment outputs
+# ==========================================
+
+results/.interference.log
+results/.interference.pid
+results/channel_logs/
+
+# ==========================================
+# Results: ignore unspecified generated files
+# ==========================================
+
+!results/
 results/*
+
 !results/.gitkeep
 
-# Editor/OS files
+# ==========================================
+# Ayesha: baseline communication results
+# ==========================================
+
+!results/baseline/
+results/baseline/**
+!results/baseline/*.csv
+!results/baseline/*.md
+
+# ==========================================
+# Ayesha: sender timing and throughput
+# ==========================================
+
+!results/timing/
+results/timing/**
+!results/timing/*.csv
+
+# ==========================================
+# Karim: interference and benchmark results
+# ==========================================
+
+!results/experiment_runs.csv
+!results/benchmark_slowdown_summary.csv
+!results/raw_samples.csv
+
+!results/channel_trials.csv
+!results/channel_metrics.csv
+!results/channel_summary.csv
+
+# ==========================================
+# CPU topology and Prabha's control results
+# ==========================================
+
+!results/cpu_topology.txt
+!results/prabha_controls/
+!results/prabha_controls/*.csv
+!results/topology/
+!results/topology/*.txt
+
+# ==========================================
+# Karim: generated research figures
+# ==========================================
+
+!results/plots/
+!results/plots/*.png
+
+# ==========================================
+# Editor and operating system files
+# ==========================================
+
 .vscode/
 .DS_Store
 Thumbs.db

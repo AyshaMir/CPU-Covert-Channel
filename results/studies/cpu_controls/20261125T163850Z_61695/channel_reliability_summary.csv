@@ -1,0 +1,8 @@
+configuration,attempts,completed_decodes,exact_successes,decode_success_rate,message_success_rate,mean_ber
+same_cpu,15,15,15,1.0,1.0,0.0
+sibling_cpu,15,0,0,0.0,0.0,N/A
+separate_cores,15,0,0,0.0,0.0,N/A
+quota_75,15,15,15,1.0,1.0,0.0
+quota_50,15,15,15,1.0,1.0,0.0
+quota_25,15,15,15,1.0,1.0,0.0
+quota_10,15,14,14,0.933333,0.933333,0.0

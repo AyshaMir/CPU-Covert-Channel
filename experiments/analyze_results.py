@@ -1,0 +1,631 @@
+#!/usr/bin/env python3
+"""
+Karim (feature/interference): analysis — legitimate-workload slowdown under interference, timing
+variance (relevant to covert-channel decoding noise), BER and throughput when
+bit strings are available (post-integration with sender/receiver).
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import math
+import statistics
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_INPUT = ROOT / "results" / "experiment_runs.csv"
+DEFAULT_RAW = ROOT / "results" / "raw_samples.csv"
+PLOTS = ROOT / "results" / "plots"
+LEVEL_ORDER = ("none", "low", "medium", "high")
+
+
+def bit_error_rate(sent: str, received: str) -> float:
+    if len(sent) != len(received):
+        raise ValueError("sent and received must be equal length")
+    if not sent:
+        return float("nan")
+    return sum(a != b for a, b in zip(sent, received)) / len(sent)
+
+def payload_throughput_bps(
+    bit_duration_ms: float,
+    message_bits: int,
+    preamble_bits: int = 8,
+) -> float:
+    """Nominal payload rate, including preamble overhead."""
+    if bit_duration_ms <= 0 or message_bits <= 0:
+        return float("nan")
+
+    total_bits = preamble_bits + message_bits
+    transmission_seconds = total_bits * bit_duration_ms / 1000.0
+
+    return message_bits / transmission_seconds
+
+
+def throughput_bps(bit_duration_ms: float, ber: float) -> float:
+    if bit_duration_ms <= 0:
+        return float("nan")
+    return (1000.0 / bit_duration_ms) * max(0.0, 1.0 - ber)
+
+
+def load_rows(path: Path) -> list[dict]:
+    with path.open(newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def level_key(name: str) -> tuple:
+    try:
+        return (LEVEL_ORDER.index(name), name)
+    except ValueError:
+        return (len(LEVEL_ORDER), name)
+
+
+def summarize(rows: list[dict]) -> list[dict]:
+    avgs: dict[str, list[float]] = defaultdict(list)
+    stds: dict[str, list[float]] = defaultdict(list)
+    cvs: dict[str, list[float]] = defaultdict(list)
+
+    for r in rows:
+        if r.get("notes"):
+            continue
+        try:
+            avg = float(r["benchmark_avg_ms"])
+            std = float(r["benchmark_std_ms"])
+            cv = float(r.get("benchmark_cv", "nan"))
+        except (KeyError, ValueError):
+            continue
+        if math.isnan(avg):
+            continue
+        level = r["interference_level"]
+        avgs[level].append(avg)
+        stds[level].append(std)
+        if not math.isnan(cv):
+            cvs[level].append(cv)
+
+    baseline = statistics.mean(avgs["none"]) if avgs.get("none") else float("nan")
+    out = []
+    for level in sorted(avgs.keys(), key=level_key):
+        mean_avg = statistics.mean(avgs[level])
+        mean_std = statistics.mean(stds[level]) if stds[level] else float("nan")
+        mean_cv = statistics.mean(cvs[level]) if cvs[level] else float("nan")
+        trial_sem = (
+            statistics.stdev(avgs[level]) / math.sqrt(len(avgs[level]))
+            if len(avgs[level]) > 1
+            else 0.0
+        )
+        out.append(
+            {
+                "interference_level": level,
+                "trials": len(avgs[level]),
+                "mean_avg_ms": mean_avg,
+                "sem_across_trials_ms": trial_sem,
+                "mean_within_trial_std_ms": mean_std,
+                "mean_cv": mean_cv,
+                "baseline_none_ms": baseline,
+                "slowdown_vs_none": mean_avg / baseline
+                if baseline and not math.isnan(baseline)
+                else float("nan"),
+            }
+        )
+    return out
+
+
+def write_summary(summary: list[dict], path: Path) -> None:
+    fields = [
+        "interference_level",
+        "trials",
+        "mean_avg_ms",
+        "sem_across_trials_ms",
+        "mean_within_trial_std_ms",
+        "mean_cv",
+        "baseline_none_ms",
+        "slowdown_vs_none",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        for row in summary:
+            w.writerow(
+                {
+                    "interference_level": row["interference_level"],
+                    "trials": row["trials"],
+                    "mean_avg_ms": f"{row['mean_avg_ms']:.6f}",
+                    "sem_across_trials_ms": f"{row['sem_across_trials_ms']:.6f}",
+                    "mean_within_trial_std_ms": f"{row['mean_within_trial_std_ms']:.6f}",
+                    "mean_cv": f"{row['mean_cv']:.6f}",
+                    "baseline_none_ms": f"{row['baseline_none_ms']:.6f}",
+                    "slowdown_vs_none": f"{row['slowdown_vs_none']:.6f}",
+                }
+            )
+
+
+def plot_results(summary: list[dict], raw_path: Path) -> None:
+    import matplotlib.pyplot as plt
+
+    PLOTS.mkdir(parents=True, exist_ok=True)
+    levels = [r["interference_level"] for r in summary]
+    slowdowns = [r["slowdown_vs_none"] for r in summary]
+    means = [r["mean_avg_ms"] for r in summary]
+    sems = [r["sem_across_trials_ms"] for r in summary]
+    stds = [r["mean_within_trial_std_ms"] for r in summary]
+
+    # 1) Slowdown (legitimate workload impact — report figure)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.bar(levels, slowdowns, color="#1f4e79", edgecolor="black", linewidth=0.4)
+    ax.axhline(1.0, color="gray", linestyle="--", linewidth=1)
+    ax.set_ylabel("Slowdown vs none")
+    ax.set_xlabel("Interference level")
+    ax.set_title("Legitimate workload slowdown under CPU interference")
+    fig.tight_layout()
+    p1 = PLOTS / "benchmark_slowdown.png"
+    fig.savefig(p1, dpi=160)
+    plt.close(fig)
+    print(f"Wrote {p1}")
+
+    # 2) Mean latency ± SEM across trials
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.bar(levels, means, yerr=sems, capsize=4, color="#2e7d32", edgecolor="black", linewidth=0.4)
+    ax.set_ylabel("Mean execution time (ms)")
+    ax.set_xlabel("Interference level")
+    ax.set_title("Probe latency vs interference (mean ± SEM across trials)")
+    fig.tight_layout()
+    p2 = PLOTS / "benchmark_latency.png"
+    fig.savefig(p2, dpi=160)
+    plt.close(fig)
+    print(f"Wrote {p2}")
+
+    # 3) Within-trial timing std (scheduling noise — channel reliability driver)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.bar(levels, stds, color="#b45309", edgecolor="black", linewidth=0.4)
+    ax.set_ylabel("Mean within-trial std (ms)")
+    ax.set_xlabel("Interference level")
+    ax.set_title("Timing variance under interference (decoding noise)")
+    fig.tight_layout()
+    p3 = PLOTS / "timing_variance.png"
+    fig.savefig(p3, dpi=160)
+    plt.close(fig)
+    print(f"Wrote {p3}")
+
+    # 4) Raw sample distributions if available
+    if raw_path.is_file():
+        by_level: dict[str, list[float]] = defaultdict(list)
+        for r in load_rows(raw_path):
+            by_level[r["interference_level"]].append(float(r["execution_time_ms"]))
+        ordered = sorted(by_level.keys(), key=level_key)
+        data = [by_level[k] for k in ordered]
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        ax.boxplot(data, labels=ordered, showfliers=False)
+        ax.set_ylabel("Execution time (ms)")
+        ax.set_xlabel("Interference level")
+        ax.set_title("Per-sample probe latency distribution")
+        fig.tight_layout()
+        p4 = PLOTS / "latency_boxplot.png"
+        fig.savefig(p4, dpi=160)
+        plt.close(fig)
+        print(f"Wrote {p4}")
+
+
+def load_channel_csv(path: Path) -> list[dict]:
+    """Optional post-integration CSV with sent_bits, decoded_bits, bit_duration_ms."""
+    return load_rows(path)
+
+
+def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    summary_csv.parent.mkdir(parents=True, exist_ok=True)
+
+    rows = load_channel_csv(path)
+    out = []
+    # Count attempted channel trials (with sender) for decode success rate
+    attempts: dict[tuple[str, str, str], int] = defaultdict(int)
+    successes: dict[tuple[str, str, str], int] = defaultdict(int)
+    correct_messages: dict[tuple[str, str, str], int] = defaultdict(int)
+
+    for r in rows:
+        if r.get("experiment") == "no_sender_receiver_control":
+            continue
+        sent = r.get("sent_bits", "")
+        recv = r.get("decoded_bits", "")
+        aff = r.get("affinity_mode", "same_cpu") or "same_cpu"
+        key = (aff, r.get("interference_level", ""), str(r.get("bit_duration_ms", "")))
+        if sent:
+            attempts[key] += 1
+        try:
+            duration = float(r.get("bit_duration_ms", "200"))
+        except ValueError:
+            duration = 200.0
+        if not sent or not recv or len(sent) != len(recv):
+            continue
+        successes[key] += 1
+        if sent == recv:
+            correct_messages[key] += 1
+        try:
+            ber = float(r.get("ber", "nan"))
+        except ValueError:
+            ber = float("nan")
+        if ber != ber:
+            ber = bit_error_rate(sent, recv)
+        try:
+            tput = float(r.get("throughput_bps", "nan"))
+        except ValueError:
+            tput = float("nan")
+        if tput != tput:
+            tput = throughput_bps(duration, ber)
+        out.append(
+            {
+                **{k: r.get(k, "") for k in r},
+                "ber": f"{ber:.6f}",
+                "throughput_bps": f"{tput:.4f}",
+            }
+        )
+
+    if out:
+        fields = list(out[0].keys())
+        with out_csv.open("w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
+            w.writerows(out)
+        print(f"Wrote channel metrics {out_csv}")
+    else:
+        print(f"No fully decoded channel rows in {path}")
+
+    groups: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
+    for r in out:
+        aff = r.get("affinity_mode", "same_cpu") or "same_cpu"
+        groups[(aff, r.get("interference_level", ""), str(r.get("bit_duration_ms", "")))].append(r)
+
+    def sort_key(k: tuple[str, str, str]) -> tuple:
+        return (k[0], level_key(k[1]), k[2])
+
+    all_keys = sorted(set(attempts.keys()) | set(groups.keys()), key=sort_key)
+    summary_rows = []
+    for key in all_keys:
+        affinity_mode, level, duration = key
+        items = groups.get(key, [])
+        n_att = attempts.get(key, 0)
+        n_ok = successes.get(key, 0)
+        decode_rate = (n_ok / n_att) if n_att else float("nan")
+        message_success_rate = (
+            correct_messages.get(key, 0) / n_att
+            if n_att
+            else float("nan")
+        )
+        if items:
+            bers = [float(i["ber"]) for i in items]
+            tputs = [float(i["throughput_bps"]) for i in items]
+            mean_ber = statistics.mean(bers)
+            mean_tput = statistics.mean(tputs)
+        else:
+            mean_ber = float("nan")
+            mean_tput = 0.0
+        # Nominal useful payload rate, accounting for the 8-bit preamble.
+        # This is a theoretical rate, not measured delivery throughput.
+        payload_lengths = [
+            len(r["sent_bits"])
+            for r in rows
+            if (
+                (r.get("affinity_mode", "same_cpu") or "same_cpu") == affinity_mode
+                and r.get("interference_level", "") == level
+                and str(r.get("bit_duration_ms", "")) == duration
+                and r.get("sent_bits")
+            )
+        ]
+
+        nominal_payload_bps = (
+            statistics.mean(
+                payload_throughput_bps(float(duration), length)
+                for length in payload_lengths
+            )
+            if payload_lengths
+            else float("nan")
+        )
+
+        # Successful-message goodput across all attempted transmissions.
+        # Failed messages deliver zero payload bits.
+        delivered_payload_bits = 0
+        total_transmission_seconds = 0.0
+
+        for r in rows:
+            row_affinity = r.get("affinity_mode", "same_cpu") or "same_cpu"
+
+            if (
+                row_affinity == affinity_mode
+                and r.get("interference_level", "") == level
+                and str(r.get("bit_duration_ms", "")) == duration
+                and r.get("sent_bits")
+            ):
+                sent = r["sent_bits"]
+                received = r.get("decoded_bits", "")
+
+                total_transmission_seconds += (
+                    (8 + len(sent)) * float(duration) / 1000.0
+                )
+
+                if received == sent:
+                    delivered_payload_bits += len(sent)
+
+        successful_goodput_bps = (
+            delivered_payload_bits / total_transmission_seconds
+            if total_transmission_seconds > 0
+            else float("nan")
+        )
+
+        benches = []
+
+        # Include benchmark measurements from all sender trials,
+        # whether decoding succeeded or failed.
+        for r in rows:
+            row_affinity = r.get("affinity_mode", "same_cpu") or "same_cpu"
+
+            if (
+                row_affinity == affinity_mode
+                and r.get("interference_level", "") == level
+                and str(r.get("bit_duration_ms", "")) == duration
+                and r.get("sent_bits")
+            ):
+                try:
+                    value = float(r.get("benchmark_avg_ms", "nan"))
+                except (ValueError, TypeError):
+                    continue
+
+                if math.isfinite(value):
+                    benches.append(value)
+        summary_rows.append(
+            {
+                "affinity_mode": affinity_mode,
+                "interference_level": level,
+                "bit_duration_ms": duration,
+                "trials_attempted": n_att,
+                "trials_decoded": n_ok,
+                "decode_success_rate": f"{decode_rate:.6f}" if decode_rate == decode_rate else "nan",
+                "message_success_rate": (
+                    f"{message_success_rate:.6f}"
+                    if math.isfinite(message_success_rate)
+                    else "nan"
+                ),
+                "mean_ber": f"{mean_ber:.6f}" if mean_ber == mean_ber else "nan",
+                "mean_throughput_bps": f"{mean_tput:.4f}",
+                "nominal_payload_bps": (
+                    f"{nominal_payload_bps:.4f}"
+                    if math.isfinite(nominal_payload_bps)
+                    else "nan"
+                ),
+                "successful_goodput_bps": (
+                    f"{successful_goodput_bps:.4f}"
+                    if math.isfinite(successful_goodput_bps)
+                    else "nan"
+                ),
+                "mean_benchmark_avg_ms": f"{statistics.mean(benches):.6f}"
+                if benches
+                else "nan",
+            }
+        )
+
+    with summary_csv.open("w", newline="", encoding="utf-8") as f:
+        fields = [
+            "affinity_mode",
+            "interference_level",
+            "bit_duration_ms",
+            "trials_attempted",
+            "trials_decoded",
+            "decode_success_rate",
+            "message_success_rate",
+            "mean_ber",
+            "mean_throughput_bps",
+            "nominal_payload_bps",
+            "successful_goodput_bps",
+            "mean_benchmark_avg_ms",
+        ]
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(summary_rows)
+    print(f"Wrote channel summary {summary_csv}")
+    for row in summary_rows:
+        print(
+            f"  affinity={row.get('affinity_mode','')} level={row['interference_level']} "
+            f"slot={row['bit_duration_ms']}ms decode={row['trials_decoded']}/{row['trials_attempted']} "
+            f"BER={row['mean_ber']} tput={row['mean_throughput_bps']} "
+            f"bench_ms={row['mean_benchmark_avg_ms']}"
+        )
+
+    if summary_rows:
+        plot_channel(summary_rows)
+
+
+def plot_channel(summary_rows: list[dict]) -> None:
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("matplotlib missing; skip channel plots", file=sys.stderr)
+        return
+
+    PLOTS.mkdir(parents=True, exist_ok=True)
+    # Prefer one duration for the main BER bar (most common / first)
+    durations = sorted({r["bit_duration_ms"] for r in summary_rows})
+    for duration in durations:
+        subset = [
+            r
+            for r in summary_rows
+            if str(r["bit_duration_ms"]) == str(duration) and r.get("affinity_mode") == "same_cpu"
+        ]
+        if not subset:
+            subset = [r for r in summary_rows if str(r["bit_duration_ms"]) == str(duration)]
+        subset = sorted(subset, key=lambda r: level_key(r["interference_level"]))
+        levels = [r["interference_level"] for r in subset]
+
+        def ffloat(row: dict, key: str) -> float:
+            try:
+                return float(row.get(key, "nan"))
+            except ValueError:
+                return float("nan")
+
+        # BER is defined only when a complete payload was decoded.
+        # Missing BER values must not be interpreted as 0% or 100%.
+        bers = [ffloat(r, "mean_ber") for r in subset]
+        decode_rates = [ffloat(r, "decode_success_rate") for r in subset]
+        tputs = [ffloat(r, "successful_goodput_bps") for r in subset]
+        benches = [ffloat(r, "mean_benchmark_avg_ms") for r in subset]
+
+        # Explicit numeric positions keep N/A categories on the x-axis.
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        positions = list(range(len(levels)))
+        plot_bers = [ber if math.isfinite(ber) else 0.0 for ber in bers]
+
+        ax.bar(
+            positions,
+            plot_bers,
+            color="#9a3412",
+            edgecolor="black",
+            linewidth=0.4,
+        )
+        ax.set_xticks(positions)
+        ax.set_xticklabels(levels)
+
+        for index, ber in enumerate(bers):
+            if not math.isfinite(ber):
+                ax.text(
+                    index, 0.05, "N/A", ha="center", va="bottom",
+                    fontsize=10, fontweight="bold",
+                )
+            else:
+                ax.text(
+                    index, ber + 0.03, f"{ber:.2f}",
+                    ha="center", va="bottom", fontsize=9,
+                )
+
+        ax.set_ylabel("Mean BER among completed decodes")
+        ax.set_xlabel("Interference level")
+        ax.set_title(f"Covert-channel BER vs interference ({duration} ms slots)")
+        ax.set_ylim(0, 1.05)
+        fig.tight_layout()
+        p = PLOTS / f"channel_ber_{duration}ms.png"
+        fig.savefig(p, dpi=160)
+        plt.close(fig)
+        print(f"Wrote {p}")
+
+        if any(d == d for d in decode_rates):
+            fig, ax = plt.subplots(figsize=(8, 4.5))
+            ax.bar(
+                levels,
+                [0.0 if d != d else d for d in decode_rates],
+                color="#7c2d12",
+                edgecolor="black",
+                linewidth=0.4,
+            )
+            ax.set_ylabel("Decode success rate")
+            ax.set_xlabel("Interference level")
+            ax.set_title(f"Decode success vs interference ({duration} ms slots)")
+            ax.set_ylim(0, 1.05)
+            fig.tight_layout()
+            p = PLOTS / f"channel_decode_success_{duration}ms.png"
+            fig.savefig(p, dpi=160)
+            plt.close(fig)
+            print(f"Wrote {p}")
+
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        ax.bar(levels, tputs, color="#1d4ed8", edgecolor="black", linewidth=0.4)
+        ax.set_ylabel("Successful-message goodput (bits/s)")
+        ax.set_xlabel("Interference level")
+        ax.set_title(f"Successful-message goodput vs interference ({duration} ms)")
+        fig.tight_layout()
+        p = PLOTS / f"channel_throughput_{duration}ms.png"
+        fig.savefig(p, dpi=160)
+        plt.close(fig)
+        print(f"Wrote {p}")
+
+        if any(b == b for b in benches):
+            fig, ax = plt.subplots(figsize=(8, 4.5))
+            ax.bar(levels, benches, color="#166534", edgecolor="black", linewidth=0.4)
+            ax.set_ylabel("Paired benchmark avg (ms)")
+            ax.set_xlabel("Interference level")
+            ax.set_title(
+                f"Legitimate probe latency during channel trials ({duration} ms)"
+            )
+            fig.tight_layout()
+            p = PLOTS / f"channel_paired_benchmark_{duration}ms.png"
+            fig.savefig(p, dpi=160)
+            plt.close(fig)
+            print(f"Wrote {p}")
+
+
+def main() -> None:
+    global PLOTS
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
+    parser.add_argument("--raw", type=Path, default=DEFAULT_RAW)
+    parser.add_argument(
+        "--summary",
+        type=Path,
+        default=ROOT / "results" / "benchmark_slowdown_summary.csv",
+    )
+    parser.add_argument("--sent-bits")
+    parser.add_argument("--received-bits")
+    parser.add_argument("--bit-duration-ms", type=float, default=200.0)
+    parser.add_argument(
+        "--channel-csv",
+        type=Path,
+        help="CSV from run_channel_experiments.py (sent_bits, decoded_bits, …)",
+    )
+    parser.add_argument(
+        "--skip-workload",
+        action="store_true",
+        help="Only analyze --channel-csv (skip experiment_runs)",
+    )
+    parser.add_argument("--plots-dir", type=Path, default=PLOTS)
+    parser.add_argument(
+        "--channel-metrics",
+        type=Path,
+        default=ROOT / "results" / "channel_metrics.csv",
+    )
+    parser.add_argument(
+        "--channel-summary",
+        type=Path,
+        default=ROOT / "results" / "channel_summary.csv",
+    )
+    args = parser.parse_args()
+    PLOTS = args.plots_dir
+
+
+    if not args.skip_workload:
+        if not args.input.is_file():
+            sys.exit(f"Missing {args.input}")
+
+        rows = load_rows(args.input)
+        summary = summarize(rows)
+        write_summary(summary, args.summary)
+        print(f"Wrote {args.summary}")
+        for row in summary:
+            print(
+                f"  {row['interference_level']}: "
+                f"mean={row['mean_avg_ms']:.3f}±{row['sem_across_trials_ms']:.3f} ms "
+                f"std={row['mean_within_trial_std_ms']:.3f} ms "
+                f"slowdown={row['slowdown_vs_none']:.3f}x"
+            )
+
+        try:
+            plot_results(summary, args.raw)
+        except ImportError:
+            sys.exit("matplotlib required: python3 -m pip install matplotlib")
+
+    if args.sent_bits and args.received_bits:
+        ber = bit_error_rate(args.sent_bits, args.received_bits)
+        tput = throughput_bps(args.bit_duration_ms, ber)
+        print(f"BER={ber:.6f}  throughput={tput:.4f} bits/s  slot={args.bit_duration_ms} ms")
+
+    channel_path = args.channel_csv
+    if channel_path is None:
+        default_ch = ROOT / "results" / "channel_trials.csv"
+        if default_ch.is_file():
+            channel_path = default_ch
+    if channel_path:
+        analyze_channel(
+            channel_path,
+            args.channel_metrics,
+            args.channel_summary,
+        )
+
+
+if __name__ == "__main__":
+    main()

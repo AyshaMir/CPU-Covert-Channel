@@ -8,12 +8,11 @@ cd "$ROOT"
 
 BENCHMARK="./bin/benchmark"
 
-SAMPLES=100
-TRIALS=5
+SAMPLES="${SAMPLES:-100}"
+TRIALS="${TRIALS:-15}"
 
-OUTPUT="results/quota_performance.csv"
-
-mkdir -p results
+OUTPUT="${QUOTA_OUTPUT:-results/integration_quota_performance.csv}"
+mkdir -p "$(dirname "$OUTPUT")"
 
 if [[ ! -x "$BENCHMARK" ]]; then
     echo "Benchmark executable not found."
