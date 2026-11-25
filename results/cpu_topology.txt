@@ -1,9 +1,56 @@
-CPU CORE SOCKET ONLINE
-  0    0      0    yes
-  1    0      0    yes
-  2    1      0    yes
-  3    1      0    yes
-  4    2      0    yes
-  5    2      0    yes
-  6    3      0    yes
-  7    3      0    yes
+recorded_at=2026-11-24T20:10:50Z
+hostname=DESKTOP-2AJS0GP
+nproc=4
+----- /proc/cpuinfo (summary) -----
+processor	: 0
+model name	: Intel(R) Core(TM) i7-3520M CPU @ 2.90GHz
+cpu MHz		: 2890.599
+siblings	: 4
+cpu cores	: 2
+processor	: 1
+model name	: Intel(R) Core(TM) i7-3520M CPU @ 2.90GHz
+cpu MHz		: 2890.599
+siblings	: 4
+cpu cores	: 2
+processor	: 2
+model name	: Intel(R) Core(TM) i7-3520M CPU @ 2.90GHz
+cpu MHz		: 2890.599
+siblings	: 4
+cpu cores	: 2
+processor	: 3
+model name	: Intel(R) Core(TM) i7-3520M CPU @ 2.90GHz
+cpu MHz		: 2890.599
+siblings	: 4
+cpu cores	: 2
+----- lscpu -----
+Architecture:                    x86_64
+CPU op-mode(s):                  32-bit, 64-bit
+Address sizes:                   36 bits physical, 48 bits virtual
+Byte Order:                      Little Endian
+CPU(s):                          4
+On-line CPU(s) list:             0-3
+Vendor ID:                       GenuineIntel
+Model name:                      Intel(R) Core(TM) i7-3520M CPU @ 2.90GHz
+CPU family:                      6
+Model:                           58
+Thread(s) per core:              2
+Core(s) per socket:              2
+Socket(s):                       1
+Stepping:                        9
+BogoMIPS:                        5781.19
+Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx rdtscp lm constant_tsc rep_good nopl xtopology cpuid pni pclmulqdq ssse3 cx16 pcid sse4_1 sse4_2 popcnt aes xsave avx f16c rdrand hypervisor lahf_lm pti ssbd ibrs ibpb stibp fsgsbase smep erms xsaveopt md_clear flush_l1d arch_capabilities
+Hypervisor vendor:               Microsoft
+Virtualization type:             full
+L1d cache:                       64 KiB (2 instances)
+L1i cache:                       64 KiB (2 instances)
+L2 cache:                        512 KiB (2 instances)
+L3 cache:                        4 MiB (1 instance)
+Vulnerability Itlb multihit:     KVM: Mitigation: VMX unsupported
+Vulnerability L1tf:              Mitigation; PTE Inversion
+Vulnerability Mds:               Mitigation; Clear CPU buffers; SMT Host state unknown
+Vulnerability Meltdown:          Mitigation; PTI
+Vulnerability Spec store bypass: Mitigation; Speculative Store Bypass disabled via prctl and seccomp
+Vulnerability Spectre v1:        Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:        Mitigation; Full generic retpoline, IBPB conditional, IBRS_FW, STIBP conditional, RSB filling
+Vulnerability Srbds:             Unknown: Dependent on hypervisor status
+Vulnerability Tsx async abort:   Not affected

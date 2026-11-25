@@ -1,4 +1,3 @@
-
 # CPU Scheduling Covert Channel
 
 Operating Systems Final Group Project
@@ -377,3 +376,72 @@ from raw logs require those local files.
 - Compare bit error rate, throughput, and workload overhead.
 - Generate final comparative graphs.
 - Complete the research report and presentation.
+
+
+
+## 16. Interference and Workload Experiments
+
+Karim implemented the interference generation, legitimate
+workload benchmarking, and automated channel experiments.
+
+### Components
+
+- `src/interference.c`: CPU load generator
+- `src/benchmark.c`: Legitimate workload benchmark
+- `scripts/interference.sh`: Configurable CPU interference
+- `experiments/run_experiments.py`: Workload slowdown analysis
+- `experiments/run_channel_experiments.py`: Channel experiments
+- `scripts/run_research_matrix.sh`: Full experiment matrix
+- `scripts/demo.sh`: Demonstration runner
+
+### Experimental Conditions
+
+Interference levels:
+
+- None
+- Low
+- Medium
+- High
+
+CPU configurations:
+
+- Sender and receiver on the same logical CPU
+- Sender and receiver on separate logical CPUs
+
+Bit durations:
+
+- 50 ms
+- 100 ms
+- 200 ms
+
+### Preliminary Findings
+
+The interference experiments showed:
+
+- Successful decoding under none, low, and medium
+  interference when sharing CPU 0.
+- Reduced decoding success under high interference.
+- No successful decoding in the tested separate-CPU
+  configurations.
+- Approximately 2.30x legitimate workload slowdown
+  under high interference.
+
+These results were obtained on Karim's WSL2 environment
+and should not be generalized without further testing.
+
+### Experimental Evidence
+
+- `docs/KARIM_RESULTS.md`
+- `results/channel_trials.csv`
+- `results/channel_summary.csv`
+- `results/benchmark_slowdown_summary.csv`
+- `results/plots/`
+
+### Integration Note
+
+Karim's original build script expects separate teammate
+worktrees. Its build paths must be adapted to the combined
+repository before running the full experiment matrix.
+
+The final integration will also standardize throughput
+definitions and verify experiment reproducibility.
