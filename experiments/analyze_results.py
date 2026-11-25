@@ -196,7 +196,7 @@ def plot_results(summary: list[dict], raw_path: Path) -> None:
         ordered = sorted(by_level.keys(), key=level_key)
         data = [by_level[k] for k in ordered]
         fig, ax = plt.subplots(figsize=(8, 4.5))
-        ax.boxplot(data, tick_labels=ordered, showfliers=False)
+        ax.boxplot(data, labels=ordered, showfliers=False)
         ax.set_ylabel("Execution time (ms)")
         ax.set_xlabel("Interference level")
         ax.set_title("Per-sample probe latency distribution")
