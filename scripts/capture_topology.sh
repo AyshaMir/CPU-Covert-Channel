@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="${1:-$ROOT/results/cpu_topology.txt}"
+OUT="${1:-$ROOT/results/topology/$(hostname)_cpu_topology.txt}"
 mkdir -p "$(dirname "$OUT")"
 
 {

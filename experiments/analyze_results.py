@@ -28,6 +28,20 @@ def bit_error_rate(sent: str, received: str) -> float:
         return float("nan")
     return sum(a != b for a, b in zip(sent, received)) / len(sent)
 
+def payload_throughput_bps(
+    bit_duration_ms: float,
+    message_bits: int,
+    preamble_bits: int = 8,
+) -> float:
+    """Nominal payload rate, including preamble overhead."""
+    if bit_duration_ms <= 0 or message_bits <= 0:
+        return float("nan")
+
+    total_bits = preamble_bits + message_bits
+    transmission_seconds = total_bits * bit_duration_ms / 1000.0
+
+    return message_bits / transmission_seconds
+
 
 def throughput_bps(bit_duration_ms: float, ber: float) -> float:
     if bit_duration_ms <= 0:
@@ -199,11 +213,15 @@ def load_channel_csv(path: Path) -> list[dict]:
 
 
 def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    summary_csv.parent.mkdir(parents=True, exist_ok=True)
+
     rows = load_channel_csv(path)
     out = []
     # Count attempted channel trials (with sender) for decode success rate
-    attempts: dict[tuple[str, str], int] = defaultdict(int)
-    successes: dict[tuple[str, str], int] = defaultdict(int)
+    attempts: dict[tuple[str, str, str], int] = defaultdict(int)
+    successes: dict[tuple[str, str, str], int] = defaultdict(int)
+    correct_messages: dict[tuple[str, str, str], int] = defaultdict(int)
 
     for r in rows:
         if r.get("experiment") == "no_sender_receiver_control":
@@ -221,6 +239,8 @@ def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
         if not sent or not recv or len(sent) != len(recv):
             continue
         successes[key] += 1
+        if sent == recv:
+            correct_messages[key] += 1
         try:
             ber = float(r.get("ber", "nan"))
         except ValueError:
@@ -267,6 +287,11 @@ def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
         n_att = attempts.get(key, 0)
         n_ok = successes.get(key, 0)
         decode_rate = (n_ok / n_att) if n_att else float("nan")
+        message_success_rate = (
+            correct_messages.get(key, 0) / n_att
+            if n_att
+            else float("nan")
+        )
         if items:
             bers = [float(i["ber"]) for i in items]
             tputs = [float(i["throughput_bps"]) for i in items]
@@ -275,28 +300,78 @@ def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
         else:
             mean_ber = float("nan")
             mean_tput = 0.0
+        # Nominal useful payload rate, accounting for the 8-bit preamble.
+        # This is a theoretical rate, not measured delivery throughput.
+        payload_lengths = [
+            len(r["sent_bits"])
+            for r in rows
+            if (
+                (r.get("affinity_mode", "same_cpu") or "same_cpu") == affinity_mode
+                and r.get("interference_level", "") == level
+                and str(r.get("bit_duration_ms", "")) == duration
+                and r.get("sent_bits")
+            )
+        ]
+
+        nominal_payload_bps = (
+            statistics.mean(
+                payload_throughput_bps(float(duration), length)
+                for length in payload_lengths
+            )
+            if payload_lengths
+            else float("nan")
+        )
+
+        # Successful-message goodput across all attempted transmissions.
+        # Failed messages deliver zero payload bits.
+        delivered_payload_bits = 0
+        total_transmission_seconds = 0.0
+
+        for r in rows:
+            row_affinity = r.get("affinity_mode", "same_cpu") or "same_cpu"
+
+            if (
+                row_affinity == affinity_mode
+                and r.get("interference_level", "") == level
+                and str(r.get("bit_duration_ms", "")) == duration
+                and r.get("sent_bits")
+            ):
+                sent = r["sent_bits"]
+                received = r.get("decoded_bits", "")
+
+                total_transmission_seconds += (
+                    (8 + len(sent)) * float(duration) / 1000.0
+                )
+
+                if received == sent:
+                    delivered_payload_bits += len(sent)
+
+        successful_goodput_bps = (
+            delivered_payload_bits / total_transmission_seconds
+            if total_transmission_seconds > 0
+            else float("nan")
+        )
+
         benches = []
-        for i in items:
-            try:
-                v = float(i.get("benchmark_avg_ms", "nan"))
-            except ValueError:
-                v = float("nan")
-            if v == v:
-                benches.append(v)
-        # Also pull benchmark from failed decode rows in raw CSV
-        if not benches:
-            for r in rows:
-                if (
-                    r.get("interference_level") == level
-                    and str(r.get("bit_duration_ms", "")) == duration
-                    and r.get("sent_bits")
-                ):
-                    try:
-                        v = float(r.get("benchmark_avg_ms", "nan"))
-                    except ValueError:
-                        continue
-                    if v == v:
-                        benches.append(v)
+
+        # Include benchmark measurements from all sender trials,
+        # whether decoding succeeded or failed.
+        for r in rows:
+            row_affinity = r.get("affinity_mode", "same_cpu") or "same_cpu"
+
+            if (
+                row_affinity == affinity_mode
+                and r.get("interference_level", "") == level
+                and str(r.get("bit_duration_ms", "")) == duration
+                and r.get("sent_bits")
+            ):
+                try:
+                    value = float(r.get("benchmark_avg_ms", "nan"))
+                except (ValueError, TypeError):
+                    continue
+
+                if math.isfinite(value):
+                    benches.append(value)
         summary_rows.append(
             {
                 "affinity_mode": affinity_mode,
@@ -305,8 +380,23 @@ def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
                 "trials_attempted": n_att,
                 "trials_decoded": n_ok,
                 "decode_success_rate": f"{decode_rate:.6f}" if decode_rate == decode_rate else "nan",
+                "message_success_rate": (
+                    f"{message_success_rate:.6f}"
+                    if math.isfinite(message_success_rate)
+                    else "nan"
+                ),
                 "mean_ber": f"{mean_ber:.6f}" if mean_ber == mean_ber else "nan",
                 "mean_throughput_bps": f"{mean_tput:.4f}",
+                "nominal_payload_bps": (
+                    f"{nominal_payload_bps:.4f}"
+                    if math.isfinite(nominal_payload_bps)
+                    else "nan"
+                ),
+                "successful_goodput_bps": (
+                    f"{successful_goodput_bps:.4f}"
+                    if math.isfinite(successful_goodput_bps)
+                    else "nan"
+                ),
                 "mean_benchmark_avg_ms": f"{statistics.mean(benches):.6f}"
                 if benches
                 else "nan",
@@ -321,8 +411,11 @@ def analyze_channel(path: Path, out_csv: Path, summary_csv: Path) -> None:
             "trials_attempted",
             "trials_decoded",
             "decode_success_rate",
+            "message_success_rate",
             "mean_ber",
             "mean_throughput_bps",
+            "nominal_payload_bps",
+            "successful_goodput_bps",
             "mean_benchmark_avg_ms",
         ]
         w = csv.DictWriter(f, fieldnames=fields)
@@ -368,20 +461,41 @@ def plot_channel(summary_rows: list[dict]) -> None:
             except ValueError:
                 return float("nan")
 
-        # Treat failed decode as BER=1.0 for plotting completeness
-        bers = []
-        for r in subset:
-            b = ffloat(r, "mean_ber")
-            if b != b:
-                b = 1.0 if ffloat(r, "decode_success_rate") == 0.0 else float("nan")
-            bers.append(0.0 if b != b else b)
+        # BER is defined only when a complete payload was decoded.
+        # Missing BER values must not be interpreted as 0% or 100%.
+        bers = [ffloat(r, "mean_ber") for r in subset]
         decode_rates = [ffloat(r, "decode_success_rate") for r in subset]
-        tputs = [ffloat(r, "mean_throughput_bps") for r in subset]
+        tputs = [ffloat(r, "successful_goodput_bps") for r in subset]
         benches = [ffloat(r, "mean_benchmark_avg_ms") for r in subset]
 
+        # Explicit numeric positions keep N/A categories on the x-axis.
         fig, ax = plt.subplots(figsize=(8, 4.5))
-        ax.bar(levels, bers, color="#9a3412", edgecolor="black", linewidth=0.4)
-        ax.set_ylabel("Mean BER (decode fail → 1.0)")
+        positions = list(range(len(levels)))
+        plot_bers = [ber if math.isfinite(ber) else 0.0 for ber in bers]
+
+        ax.bar(
+            positions,
+            plot_bers,
+            color="#9a3412",
+            edgecolor="black",
+            linewidth=0.4,
+        )
+        ax.set_xticks(positions)
+        ax.set_xticklabels(levels)
+
+        for index, ber in enumerate(bers):
+            if not math.isfinite(ber):
+                ax.text(
+                    index, 0.05, "N/A", ha="center", va="bottom",
+                    fontsize=10, fontweight="bold",
+                )
+            else:
+                ax.text(
+                    index, ber + 0.03, f"{ber:.2f}",
+                    ha="center", va="bottom", fontsize=9,
+                )
+
+        ax.set_ylabel("Mean BER among completed decodes")
         ax.set_xlabel("Interference level")
         ax.set_title(f"Covert-channel BER vs interference ({duration} ms slots)")
         ax.set_ylim(0, 1.05)
@@ -412,9 +526,9 @@ def plot_channel(summary_rows: list[dict]) -> None:
 
         fig, ax = plt.subplots(figsize=(8, 4.5))
         ax.bar(levels, tputs, color="#1d4ed8", edgecolor="black", linewidth=0.4)
-        ax.set_ylabel("Mean effective throughput (bits/s)")
+        ax.set_ylabel("Successful-message goodput (bits/s)")
         ax.set_xlabel("Interference level")
-        ax.set_title(f"Effective throughput vs interference ({duration} ms slots)")
+        ax.set_title(f"Successful-message goodput vs interference ({duration} ms)")
         fig.tight_layout()
         p = PLOTS / f"channel_throughput_{duration}ms.png"
         fig.savefig(p, dpi=160)
@@ -437,6 +551,7 @@ def plot_channel(summary_rows: list[dict]) -> None:
 
 
 def main() -> None:
+    global PLOTS
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--raw", type=Path, default=DEFAULT_RAW)
@@ -458,7 +573,20 @@ def main() -> None:
         action="store_true",
         help="Only analyze --channel-csv (skip experiment_runs)",
     )
+    parser.add_argument("--plots-dir", type=Path, default=PLOTS)
+    parser.add_argument(
+        "--channel-metrics",
+        type=Path,
+        default=ROOT / "results" / "channel_metrics.csv",
+    )
+    parser.add_argument(
+        "--channel-summary",
+        type=Path,
+        default=ROOT / "results" / "channel_summary.csv",
+    )
     args = parser.parse_args()
+    PLOTS = args.plots_dir
+
 
     if not args.skip_workload:
         if not args.input.is_file():
@@ -494,8 +622,8 @@ def main() -> None:
     if channel_path:
         analyze_channel(
             channel_path,
-            ROOT / "results" / "channel_metrics.csv",
-            ROOT / "results" / "channel_summary.csv",
+            args.channel_metrics,
+            args.channel_summary,
         )
 
 

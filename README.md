@@ -1,3 +1,4 @@
+
 # CPU Scheduling Covert Channel
 
 Operating Systems Final Group Project
@@ -134,7 +135,7 @@ The compiled executables are excluded from version control.
 
 ### Receiver Self-Test
 
-./receiver --self-test
+./bin/receiver --self-test
 
 This runs the receiver's built-in synthetic decoding test.
 
@@ -166,9 +167,9 @@ Raw output is saved locally under results/baseline/.
 The sender and receiver can also be executed independently
 using their command-line interfaces:
 
-./sender <bits></bits> <duration_ms> <start_ns> [--timing]
+./bin/sender <bits></bits> <duration_ms> <start_ns> [--timing]
 
-./receiver <message_length> <duration_ms> <start_ns>
+./bin/receiver <message_length> <duration_ms> <start_ns>
 
 The start_ns argument must represent a shared future
 CLOCK_MONOTONIC timestamp in nanoseconds.
@@ -376,8 +377,6 @@ from raw logs require those local files.
 - Compare bit error rate, throughput, and workload overhead.
 - Generate final comparative graphs.
 - Complete the research report and presentation.
-
-
 
 ## 16. Interference and Workload Experiments
 

@@ -11,7 +11,7 @@ DURATIONS=(200 100 50)
 cd "$(dirname "$0")/.."
 
 # Check that the sender executable exists
-if [[ ! -x ./sender ]]; then
+if [[ ! -x ./bin/sender ]]; then
     echo "Error: Compile sender.c first."
     exit 1
 fi
@@ -56,7 +56,7 @@ for duration in "${DURATIONS[@]}"; do
 
         # Run sender alone with timing instrumentation
         if taskset -c "$CPU" \
-            ./sender "$MESSAGE" "$duration" "$START" --timing \
+            ./bin/sender "$MESSAGE" "$duration" "$START" --timing \
             > "$OUTPUT" 2>&1; then
 
             if grep -q "TIMING_RESULTS_END" "$OUTPUT"; then

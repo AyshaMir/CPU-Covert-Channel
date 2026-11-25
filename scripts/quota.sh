@@ -11,8 +11,7 @@ BENCHMARK="./bin/benchmark"
 SAMPLES=100
 TRIALS=5
 
-OUTPUT="results/quota_performance.csv"
-
+OUTPUT="results/integration_quota_performance.csv"
 mkdir -p results
 
 if [[ ! -x "$BENCHMARK" ]]; then

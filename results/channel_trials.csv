@@ -41,3 +41,4 @@ trial_id,recorded_at,experiment,sent_bits,decoded_bits,bit_duration_ms,interfere
 40,2026-11-24T20:18:13.173764+00:00,channel_under_interference,10101010,,200,high,4,separate_cpus,0,2,0+2,-1,nan,nan,15.634120,0,1,DESKTOP-2AJS0GP,no_decoded_bits
 41,2026-11-24T20:18:26.898100+00:00,no_sender_receiver_control,,,100,none,0,same_cpu,0,0,0,-1,nan,nan,2.521690,skipped,1,DESKTOP-2AJS0GP,no_sender_control
 42,2026-11-24T20:18:39.065372+00:00,no_sender_receiver_control,,,100,high,4,same_cpu,0,0,0,-1,nan,nan,17.037840,skipped,1,DESKTOP-2AJS0GP,no_sender_control
+43,2026-11-25T10:34:15.560179+00:00,channel_under_interference,10101010,10101010,100,low,1,same_cpu,0,0,0,0,0.000000,10.0000,3.768200,0,0,DESKTOP-V8D55GU,

@@ -9,7 +9,7 @@ DURATIONS=(200 100 50)
 
 cd "$(dirname "$0")/.."
 
-if [[ ! -x ./sender || ! -x ./receiver ]]; then
+if [[ ! -x ./bin/sender || ! -x ./bin/receiver ]]; then
     echo "Error: Compile sender and receiver first."
     exit 1
 fi
@@ -45,12 +45,12 @@ for duration in "${DURATIONS[@]}"; do
             'import time; print(time.monotonic_ns() + 5_000_000_000)')
 
         taskset -c "$CPU" \
-            ./receiver "${#MESSAGE}" "$duration" "$START" \
+            ./bin/receiver "${#MESSAGE}" "$duration" "$START" \
             > "$RECEIVER_LOG" 2>&1 &
         RP=$!
 
         taskset -c "$CPU" \
-            ./sender "$MESSAGE" "$duration" "$START" --timing \
+            ./bin/sender "$MESSAGE" "$duration" "$START" --timing \
             > "$SENDER_LOG" 2>&1 &
         SP=$!
 

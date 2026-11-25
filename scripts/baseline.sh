@@ -76,12 +76,12 @@ for ((i=1; i<=TRIALS; i++)); do
         'import time; print(time.monotonic_ns() + 5_000_000_000)')
 
     taskset -c "$CPU" \
-        ./receiver "${#MESSAGE}" "$DURATION" "$START" \
+        ./bin/receiver "${#MESSAGE}" "$DURATION" "$START" \
         > "$RECEIVER_FILE" 2>&1 &
     RP=$!
 
     taskset -c "$CPU" \
-        ./sender "$MESSAGE" "$DURATION" "$START" \
+        ./bin/sender "$MESSAGE" "$DURATION" "$START" \
         > "$SENDER_FILE" 2>&1 &
     SP=$!
 

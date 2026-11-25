@@ -334,7 +334,7 @@ def main() -> None:
 
     ensure_channel_bins()
     RESULTS.mkdir(parents=True, exist_ok=True)
-    log_dir = RESULTS / "channel_logs"
+    log_dir = args.output.parent / "channel_logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
     if args.fresh and args.output.is_file():

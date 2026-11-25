@@ -10,8 +10,7 @@ BENCHMARK="./bin/benchmark"
 SAMPLES=100
 TRIALS=5
 
-OUTPUT="results/affinity_performance.csv"
-
+OUTPUT="results/integration_affinity_performance.csv"
 mkdir -p results
 
 if [[ ! -x "$BENCHMARK" ]]; then
@@ -43,7 +42,7 @@ run_test "baseline" 0
 
 echo "Recording available CPU topology..."
 lscpu -e=CPU,CORE,SOCKET,ONLINE \
-    > results/cpu_topology.txt
+    > results/integration_cpu_topology.txt
 
 echo "Running same CPU performance test..."
 taskset -c 0 stress-ng --cpu 1 --timeout 10s &
