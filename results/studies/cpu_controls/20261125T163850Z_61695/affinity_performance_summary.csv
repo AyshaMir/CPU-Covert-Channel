@@ -1,0 +1,5 @@
+configuration,trials,mean_ms,std_ms,slowdown
+baseline,15,1.599585,0.130736,1.0
+same_cpu,15,3.617696,0.298588,2.261647
+sibling_cpu,15,1.945372,0.165454,1.216173
+separate_cores,15,1.905322,0.120021,1.191135

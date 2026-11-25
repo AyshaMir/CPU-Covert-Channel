@@ -1,0 +1,26 @@
+Expected message length: 8 bits
+Bit duration: 50 ms
+Scheduled start: 26878581474004 ns
+Preamble validation failed.
+
+Slot,CPU_time_ratio
+1,0.999573
+2,0.999605
+3,0.999585
+4,0.999561
+5,0.999585
+6,0.999611
+7,0.999607
+8,0.999597
+9,0.996073
+10,0.999233
+11,0.999623
+12,0.999617
+13,0.999595
+14,0.999179
+15,0.999587
+16,0.999617
+
+Busy reference: 0.999581
+Idle reference: 0.999600
+Threshold: 0.999591

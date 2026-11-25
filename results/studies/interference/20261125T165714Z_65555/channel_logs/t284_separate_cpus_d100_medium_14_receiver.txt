@@ -1,0 +1,25 @@
+Expected message length: 8 bits
+Bit duration: 100 ms
+Scheduled start: 27535360982337 ns
+Unable to distinguish CPU activity.
+
+Slot,CPU_time_ratio
+1,0.999634
+2,0.999649
+3,0.999648
+4,0.999650
+5,0.999647
+6,0.999654
+7,0.999527
+8,0.999461
+9,0.999651
+10,0.999563
+11,0.999653
+12,0.999650
+13,0.999649
+14,0.999651
+15,0.999643
+16,0.999639
+
+Busy reference: 0.999645
+Idle reference: 0.999572
