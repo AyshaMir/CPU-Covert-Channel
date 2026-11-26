@@ -1,4 +1,3 @@
-
 # CPU Scheduling Covert Channel
 
 **Operating Systems — Final Group Project**
@@ -121,6 +120,8 @@ Compiled binaries are generated under `bin/` and excluded from Git.
 The project requires a Linux environment with GCC, Python 3, Bash, `taskset`, `stress-ng`, and a working user-level systemd environment for CPU quota experiments.
 
 Matplotlib is required for generating graphs.
+
+CPU affinity experiments require at least three available logical CPUs (including CPUs 0 and 2). Verify the CPUs available to the process using `<span>taskset -pc $$</span>` before running the studies.
 
 ### Build
 

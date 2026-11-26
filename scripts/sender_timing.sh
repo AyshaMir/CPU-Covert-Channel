@@ -75,5 +75,5 @@ done
 echo ""
 echo "===================================="
 echo "Sender timing experiments finished."
-echo "Results saved in results/timing/"
+echo "Results saved in ${TIMING_OUTPUT_DIR}/"
 echo "===================================="

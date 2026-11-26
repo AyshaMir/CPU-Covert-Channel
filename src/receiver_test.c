@@ -35,7 +35,7 @@ int main(void) {
 
         double ber = calculate_ber(expected, test_cases[i]);
 
-        printf("Test case %d\n", i + 1);
+        printf("Test case %d (BER calculation example; errors are intentional)\n", i + 1);
         printf("Expected: %s\n", expected);
         printf("Observed: %s\n", test_cases[i]);
         printf("BER: %.2f%%\n", ber * 100);
