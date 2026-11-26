@@ -1,0 +1,10 @@
+configuration,message,trial,duration_ms,sender_quota,received,completed_decode,exact_success,bit_errors,ber,outcome,sender_exit,receiver_exit
+same_cpu,11111111,1,200,unrestricted,11111111,1,1,0,0.0,success,0,0
+quota_25,11111111,1,200,25,11111111,1,1,0,0.0,success,0,0
+quota_10,11111111,1,200,10,11111111,1,1,0,0.0,success,0,0
+same_cpu,00000000,1,200,unrestricted,00000000,1,1,0,0.0,success,0,0
+quota_25,00000000,1,200,25,00000000,1,1,0,0.0,success,0,0
+quota_10,00000000,1,200,10,00000000,1,1,0,0.0,success,0,0
+same_cpu,11001010,1,200,unrestricted,11001010,1,1,0,0.0,success,0,0
+quota_25,11001010,1,200,25,11001010,1,1,0,0.0,success,0,0
+quota_10,11001010,1,200,10,11001010,1,1,0,0.0,success,0,0

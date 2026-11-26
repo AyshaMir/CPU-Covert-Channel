@@ -1,0 +1,5 @@
+Preamble: 11110000
+Transmitting: 00000000
+Bit duration: 200 ms
+Scheduled start: 39341101367503 ns
+Transmission complete!

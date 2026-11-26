@@ -1,0 +1,10 @@
+trial_id,recorded_at,experiment,sent_bits,decoded_bits,bit_duration_ms,interference_level,interference_workers,affinity_mode,sender_cpu,receiver_cpu,affinity_cpu,bit_errors,ber,throughput_bps,benchmark_avg_ms,sender_rc,receiver_rc,host,notes
+1,2026-11-26T06:24:20.496268+00:00,channel_under_interference,11111111,11111111,100,low,1,same_cpu,0,0,0,0,0.000000,10.0000,5.723204,0,0,DESKTOP-V8D55GU,
+2,2026-11-26T06:21:17.413002+00:00,channel_under_interference,11111111,,100,medium,4,same_cpu,0,0,0,-1,nan,nan,8.337905,0,1,DESKTOP-V8D55GU,no_decoded_bits
+3,2026-11-26T06:21:27.145722+00:00,channel_under_interference,11111111,11111111,100,high,8,same_cpu,0,0,0,0,0.000000,10.0000,15.866826,0,0,DESKTOP-V8D55GU,
+4,2026-11-26T06:21:36.824119+00:00,channel_under_interference,00000000,00000000,100,low,1,same_cpu,0,0,0,0,0.000000,10.0000,3.080053,0,0,DESKTOP-V8D55GU,
+5,2026-11-26T06:21:45.223848+00:00,channel_under_interference,00000000,00000000,100,medium,4,same_cpu,0,0,0,0,0.000000,10.0000,3.735386,0,0,DESKTOP-V8D55GU,
+6,2026-11-26T06:21:53.949330+00:00,channel_under_interference,00000000,,100,high,8,same_cpu,0,0,0,-1,nan,nan,7.234330,0,1,DESKTOP-V8D55GU,no_decoded_bits
+7,2026-11-26T06:22:02.689443+00:00,channel_under_interference,11001010,11001010,100,low,1,same_cpu,0,0,0,0,0.000000,10.0000,2.752981,0,0,DESKTOP-V8D55GU,
+8,2026-11-26T06:22:11.024044+00:00,channel_under_interference,11001010,11001010,100,medium,4,same_cpu,0,0,0,0,0.000000,10.0000,2.596911,0,0,DESKTOP-V8D55GU,
+9,2026-11-26T06:25:31.538949+00:00,channel_under_interference,11001010,,100,high,8,same_cpu,0,0,0,-1,nan,nan,3.076053,0,1,DESKTOP-V8D55GU,no_decoded_bits

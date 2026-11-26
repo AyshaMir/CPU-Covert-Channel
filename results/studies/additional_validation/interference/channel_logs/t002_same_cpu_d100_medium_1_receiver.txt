@@ -1,0 +1,4 @@
+Expected message length: 8 bits
+Bit duration: 100 ms
+Scheduled start: 39773766282327 ns
+Missed measurement interval.

@@ -1,0 +1,4 @@
+trial_id,recorded_at,experiment,sent_bits,decoded_bits,bit_duration_ms,interference_level,interference_workers,affinity_mode,sender_cpu,receiver_cpu,affinity_cpu,bit_errors,ber,throughput_bps,benchmark_avg_ms,sender_rc,receiver_rc,host,notes
+1,2026-11-26T05:36:11.245453+00:00,channel_under_interference,11111111,11111111,100,none,0,same_cpu,0,0,0,0,0.000000,10.0000,5.760549,0,0,DESKTOP-V8D55GU,
+2,2026-11-26T05:36:47.066298+00:00,channel_under_interference,00000000,00000000,100,none,0,same_cpu,0,0,0,0,0.000000,10.0000,3.937651,0,0,DESKTOP-V8D55GU,
+3,2026-11-26T05:37:17.611480+00:00,channel_under_interference,11001010,11001010,100,none,0,same_cpu,0,0,0,0,0.000000,10.0000,3.780329,0,0,DESKTOP-V8D55GU,

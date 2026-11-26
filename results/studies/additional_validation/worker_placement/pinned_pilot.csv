@@ -1,0 +1,2 @@
+trial_id,recorded_at,experiment,sent_bits,decoded_bits,bit_duration_ms,interference_level,interference_workers,affinity_mode,sender_cpu,receiver_cpu,affinity_cpu,bit_errors,ber,throughput_bps,benchmark_avg_ms,sender_rc,receiver_rc,host,notes
+1,2026-11-26T06:33:46.185374+00:00,channel_under_interference,11001010,,100,high,8,same_cpu,0,0,0,-1,nan,nan,3.658231,0,1,DESKTOP-V8D55GU,no_decoded_bits
